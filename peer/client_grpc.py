@@ -83,7 +83,7 @@ class NapsterClient:
     async def song_request(self, stub, song_name):
         try:
             if song_name in self.local_songs:
-                print(f"Song '{song_name}' found in your music directory.\n> ", end="")
+                print(f"Song '{song_name}' found in your music directory")
                 return
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
