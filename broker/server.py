@@ -69,6 +69,7 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                         for id, queue in self.client_queues.items():
                             if id != client_id:
                                 await queue.put(broker_pb2.Update(type="delete", song_name=song))
+            print(f"Client {client_id} left.")
             return broker_pb2.Ack(success=True)
         return broker_pb2.Ack(success=False)
 
