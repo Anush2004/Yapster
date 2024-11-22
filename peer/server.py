@@ -47,6 +47,8 @@
 import asyncio
 import os
 
+server_folder = "."
+
 async def handle_client(reader, writer):
     addr = writer.get_extra_info('peername')
     print(f"Connection established with {addr}")
@@ -67,7 +69,7 @@ async def handle_client(reader, writer):
         
         # Receive file request
         file_request = await reader.read(1024)
-        file_request = file_request.decode().strip()
+        file_request = os.path.join(server_folder, file_request.decode().strip())
         print(f"Client requested file: {file_request}")
         
         if os.path.exists(file_request):
