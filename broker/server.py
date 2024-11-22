@@ -20,7 +20,10 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
 
     async def Heartbeat(self, request, context):
         print(f"Heartbeat received for client {request.client_id}.")
-        self.clients[request.client_id] = time.time()
+        if request.client_id in self.clients:
+            self.clients[request.client_id] = time.time()
+        else:
+            return broker_pb2.Ack(success=False)
         return broker_pb2.Ack(success=True)
 
     async def InitializeClient(self, request_iterator, context):
