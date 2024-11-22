@@ -34,7 +34,9 @@ class NapsterClient:
     async def initialize_client(self, stub):
         # Load initial songs from the music directory
         self.local_songs = set(os.listdir(self.music_dir))
+        
         async def song_update_stream():
+            yield broker_pb2.SongUpdate(client_id=self.client_id)
             for song_name in self.local_songs:
                 print(song_name)
                 yield broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name)

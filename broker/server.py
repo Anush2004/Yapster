@@ -37,6 +37,7 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                 self.clients[client_id] = time.time()
                 self.client_queues[client_id] = asyncio.Queue()
                 first_message = False
+                continue
 
             # Add the song from the SongUpdate message
             
