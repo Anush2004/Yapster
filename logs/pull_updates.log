@@ -1,5 +1,1 @@
-Error pulling updates: <AioRpcError of RPC that terminated with:
-	status = StatusCode.UNAVAILABLE
-	details = "failed to connect to all addresses; last error: UNKNOWN: ipv4:192.168.2.220:4018: connection attempt timed out before receiving SETTINGS frame"
-	debug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"failed to connect to all addresses; last error: UNKNOWN: ipv4:192.168.2.220:4018: connection attempt timed out before receiving SETTINGS frame", grpc_status:14, created_time:"2024-11-22T22:36:35.327763066+05:30"}"
->
+Received update: add - nlu.mp4
