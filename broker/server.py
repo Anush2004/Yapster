@@ -77,7 +77,7 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         if request.client_id not in self.clients:
             return broker_pb2.SongResponse(found=False,message="Client not registered.")
         if request.song_name in self.songs:
-            return broker_pb2.SongResponse(client_ids=self.songs[request.song_name][0], found=True, message="Song found.")
+            return broker_pb2.SongResponse(client_id=self.songs[request.song_name][0], found=True, message="Song found.")
         return broker_pb2.SongResponse(found=False,message="Song not found.")
 
     async def AddSong(self, request, context):
@@ -130,6 +130,9 @@ async def cleanup_clients(broker, interval=10, timeout=10):
                     owners.remove(client_id)
                     if not owners:
                         del broker.songs[song]
+                        for id, queue in broker.client_queues.items():
+                            if id != client_id:
+                                await queue.put(broker_pb2.Update(type="delete", song_name=song))
 
 
 async def serve():
