@@ -148,26 +148,6 @@ class NapsterClient:
                 break
             else:
                 print("Unknown command. Type 'help' for a list of commands.")
-
-
-    # async def run(self):
-    #     async with grpc.aio.insecure_channel(self.server_address) as channel:
-    #         stub = broker_pb2_grpc.NapsterServiceStub(channel)
-
-    #         # Initialize client
-    #         await self.initialize_client(stub)
-
-    #         # Start the heartbeat in the background
-    #         asyncio.create_task(self.heartbeat(stub))
-
-    #         # Start pulling updates in the background
-    #         asyncio.create_task(self.pull_updates(stub))
-
-    #         # Monitor the directory for changes
-    #         asyncio.create_task(self.monitor_directory(stub))
-
-    #         # Start the interactive command interface
-    #         # await self.command_interface(stub)
     
     async def run(self):
         try:
