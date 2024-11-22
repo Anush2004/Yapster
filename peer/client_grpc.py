@@ -12,7 +12,7 @@ import broker_pb2
 import broker_pb2_grpc
 
 class NapsterClient:
-    def __init__(self, client_id, server_address='192.168.2.140:12345', music_dir="music"):
+    def __init__(self, client_id, server_address='192.168.2.220:4000', music_dir="music"):
         self.client_id = client_id
         self.server_address = server_address
         self.music_dir = music_dir
@@ -29,13 +29,14 @@ class NapsterClient:
                     print(f"Heartbeat failed for client {self.client_id}.")
             except Exception as e:
                 print(f"Error sending heartbeat: {e}")
-            await asyncio.sleep(5)  # Send heartbeat every 5 seconds
+            await asyncio.sleep(2)  # Send heartbeat every 5 seconds
 
     async def initialize_client(self, stub):
         # Load initial songs from the music directory
         self.local_songs = set(os.listdir(self.music_dir))
         async def song_update_stream():
             for song_name in self.local_songs:
+                print(song_name)
                 yield broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name)
                 await asyncio.sleep(0.1)
         # try:    

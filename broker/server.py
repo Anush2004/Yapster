@@ -39,9 +39,13 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                 first_message = False
 
             # Add the song from the SongUpdate message
+            
             if update.song_name:
                 if update.song_name not in self.songs:
                     self.songs[update.song_name] = []
+                    for id, queue in self.client_queues.items():
+                        if id != client_id:
+                            await queue.put(broker_pb2.Update(type="add", song_name=update.song_name))
                 if client_id not in self.songs[update.song_name]:
                     self.songs[update.song_name].append(client_id)
         if client_id is not None:
@@ -60,6 +64,9 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                     owners.remove(client_id)
                     if not owners:
                         del self.songs[song]
+                        for id, queue in self.client_queues.items():
+                            if id != client_id:
+                                await queue.put(broker_pb2.Update(type="delete", song_name=song))
             return broker_pb2.Ack(success=True)
         return broker_pb2.Ack(success=False)
 
@@ -126,12 +133,12 @@ async def serve():
         server = grpc.aio.server()
         broker = Broker()
         broker_pb2_grpc.add_NapsterServiceServicer_to_server(broker, server)
-        server.add_insecure_port('0.0.0.0:50051')
+        server.add_insecure_port('0.0.0.0:4000')
 
         # Start the cleanup coroutine
         asyncio.create_task(cleanup_clients(broker))
 
-        print("Server starting on port 50051...")
+        print("Server starting on port 4000...")
         await server.start()
         await server.wait_for_termination()
     except Exception as e:
