@@ -2,6 +2,7 @@ import asyncio
 import grpc
 from collections import defaultdict
 import time
+import os
 import sys
 pwd = os.getcwd()
 pwd = pwd.split('/')
@@ -19,7 +20,7 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
 
     async def Heartbeat(self, request, context):
         self.clients[request.client_id] = time.time()
-        return broker_pb2.HeartbeatResponse(success=True)
+        return broker_pb2.Ack(success=True)
 
     async def InitializeClient(self, request_iterator, context):
         first_message = True
@@ -29,7 +30,8 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                 # Use the first message to register the client
                 client_id = update.client_id
                 if client_id in self.clients:
-                    return broker_pb2.ClientResponse(success=False, message="Client already exists.")
+                    yield broker_pb2.Update(type="error", song_name="Client already exists.")
+                    return 
                 self.clients[client_id] = time.time()
                 self.client_queues[client_id] = asyncio.Queue()
                 first_message = False
@@ -40,11 +42,12 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                     self.songs[update.song_name] = []
                 if client_id not in self.songs[update.song_name]:
                     self.songs[update.song_name].append(client_id)
-
-        # Final response after processing the stream
-        return broker_pb2.ClientResponse(success=True, message="Client initialized with songs.")
-
-
+        if client_id is not None:
+            for song, owners in self.songs.items():
+                if client_id not in owners:
+                    yield broker_pb2.Update(type="add", song_name=song)
+        
+    
     async def Leave(self, request, context):
         client_id = request.client_id
         if client_id in self.clients:
@@ -55,8 +58,8 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                     owners.remove(client_id)
                     if not owners:
                         del self.songs[song]
-            return broker_pb2.LeaveResponse(success=True)
-        return broker_pb2.LeaveResponse(success=False)
+            return broker_pb2.Ack(success=True)
+        return broker_pb2.Ack(success=False)
 
     async def SongRequest(self, request, context):
         if request.client_id not in self.clients:

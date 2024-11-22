@@ -1,6 +1,6 @@
 import socket
 
-def request_file(server_ip='10.1.36.116', port=12345, file_name='shared_file.txt', save_as='received_file.txt'):
+def request_file(server_ip='192.168.2.140', port=12345, file_name='shared_file.txt', save_as='received_file.txt'):
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     print(f"Connecting to server at {server_ip}:{port}")
     client_socket.connect((server_ip, port))

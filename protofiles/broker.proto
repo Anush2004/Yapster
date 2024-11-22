@@ -15,7 +15,7 @@ syntax = "proto3";
 
 service NapsterService {
     rpc Heartbeat(ClientInfo) returns (Ack);
-    rpc InitializeClient(stream SongUpdate) returns (SongUpdateResponse);
+    rpc InitializeClient(stream SongUpdate) returns (stream Update);
     rpc Leave(ClientInfo) returns (Ack); //graceful leave
     rpc SongRequest(SongRequestMessage) returns (SongResponse);
     rpc AddSong(SongUpdate) returns (SongUpdateResponse);
