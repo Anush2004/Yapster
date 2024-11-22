@@ -57,26 +57,26 @@ class NapsterClient:
                 if update.type == "add":
                     self.external_songs.add(update.song_name)
         except Exception as e:
-            print(f"Error during initialization: {e}\n> ", end="")
+            print(f"Error during initialization: {e}")
 
     async def leave(self, stub):
         try:
             response = await stub.Leave(broker_pb2.ClientInfo(client_id=self.client_id))
-            print(f"Leave response: {response.success}\n> ", end="")
+            print(f"Leave response: {response.success}", end="")
         except Exception as e:
             print(f"Error during leave: {e}\n> ", end="")
 
     async def add_song(self, stub, song_name):
         try:
             response = await stub.AddSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
-            print(f"Add song response: {response.message}\n> ", end="")
+            # print(f"Add song response: {response.message}\n> ", end="")
         except Exception as e:
             print(f"Error adding song: {e}\n> ", end="")
 
     async def delete_song(self, stub, song_name):
         try:
             response = await stub.DeleteSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
-            print(f"Delete song response: {response.message}\n> ", end="")
+            # print(f"Delete song response: {response.message}\n> ", end="")
         except Exception as e:
             print(f"Error deleting song: {e}\n> ", end="")
 
@@ -87,10 +87,13 @@ class NapsterClient:
                 return
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
-                print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
+                # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
+                print(f"Song '{song_name}' found. Requesting file...")
                 ip_address = response.client_id.split(":")[0]
                 port = int(response.client_id.split(":")[1])
-                await request_file_from_peer(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+                # print("Going to request")
+                request_file_from_peer(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+                print("File received successfully")
             else:
                 print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
         except Exception as e:
@@ -119,6 +122,7 @@ class NapsterClient:
 
                 for song in new_songs:
                     await self.add_song(stub, song)
+                    self.external_songs.remove(song)
                 for song in deleted_songs:
                     await self.delete_song(stub, song)
 
@@ -129,6 +133,14 @@ class NapsterClient:
         """Handles interactive commands from the user."""
         print("Interactive mode started. Type 'help' for a list of commands.")
         while True:
+            await asyncio.sleep(2) # Sleep for a bit to avoid spamming the console
+            print()
+            print("Available commands:")
+            print("  list_mine      - List all songs in your music directory")
+            print("  list_others    - List all songs available in the network")
+            print("  request <song> - Request a song from the broker")
+            print("  help           - Show this help message")
+            print("  exit           - Exit the client")
             command = await aioconsole.ainput("> ")  # Await the asynchronous input
             command = command.strip().lower()  # Now strip and lower the input
 
@@ -194,6 +206,7 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
     with open('../logs/peer_client.log', 'w') as f:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         f.write(f"Connecting to server at {server_ip}:{port}\n")
+        f.flush()
         client_socket.connect((server_ip, port))
         f.write(f"Connected to server at {server_ip}:{port}\n")
         f.flush()
@@ -202,7 +215,7 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
             client_socket.send(b"CONNECT")
             response = client_socket.recv(1024).decode()
             if not response.startswith("ACK"):            
-                print(f"Server response: {response}.Try Again.\n> ", end="")
+                print(f"Server response: {response}.Try Again.")
                 return
             f.write("Connection established with server\n")
             f.flush()
@@ -210,9 +223,9 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
             client_socket.send(file_name.encode())
             response = client_socket.recv(32).decode()
             if response.startswith("ERROR"):
-                print(f"Server response: {response}.Try Again.\n> ", end="")
+                print(f"Server response: {response}.Try Again")
                 return
-            f.write(f"Server response: {response}\n")
+            f.write(f"Server response: {response}")
             f.flush()
             
             # Receive file
@@ -221,9 +234,9 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
                 while (data := client_socket.recv(1024)):
                     file.write(data)
         
-            print(f"File has been received and saved in your music directory as {save_as}\n> ", end="")
+            # print(f"File has been received and saved in your music directory as {save_as}\n> ", end="")
         except Exception as e:
-            print(f"Error: {e}.Try Again.\n> ", end="")
+            print(f"Error: {e}.Try Again")
         finally:
             client_socket.close()
       
