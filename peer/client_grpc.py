@@ -50,51 +50,51 @@ class NapsterClient:
                 yield broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name)
         try:    
             async for update in stub.InitializeClient(song_update_stream()):
-                print(f"Received update: {update.type} - {update.song_name}")
+                # print(f"Received update: {update.type} - {update.song_name}")
                 if update.type == "error":
                     print(f"Error during initialization: {update.song_name}")
                     return
                 if update.type == "add":
                     self.external_songs.add(update.song_name)
         except Exception as e:
-            print(f"Error during initialization: {e}\n> ")
+            print(f"Error during initialization: {e}\n> ", end="")
 
     async def leave(self, stub):
         try:
             response = await stub.Leave(broker_pb2.ClientInfo(client_id=self.client_id))
-            print(f"Leave response: {response.success}\n> ")
+            print(f"Leave response: {response.success}\n> ", end="")
         except Exception as e:
-            print(f"Error during leave: {e}\n> ")
+            print(f"Error during leave: {e}\n> ", end="")
 
     async def add_song(self, stub, song_name):
         try:
             response = await stub.AddSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
-            print(f"Add song response: {response.message}\n> ")
+            print(f"Add song response: {response.message}\n> ", end="")
         except Exception as e:
-            print(f"Error adding song: {e}\n> ")
+            print(f"Error adding song: {e}\n> ", end="")
 
     async def delete_song(self, stub, song_name):
         try:
             response = await stub.DeleteSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
-            print(f"Delete song response: {response.message}\n> ")
+            print(f"Delete song response: {response.message}\n> ", end="")
         except Exception as e:
-            print(f"Error deleting song: {e}\n> ")
+            print(f"Error deleting song: {e}\n> ", end="")
 
     async def song_request(self, stub, song_name):
         try:
             if song_name in self.local_songs:
-                print(f"Song '{song_name}' found in your music directory.\n> ")
+                print(f"Song '{song_name}' found in your music directory.\n> ", end="")
                 return
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
-                # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ")
+                print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
                 ip_address = response.client_id.split(":")[0]
                 port = int(response.client_id.split(":")[1])
-                request_file_from_peer(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+                await request_file_from_peer(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
             else:
-                print(f"Song '{song_name}' not found. Message: {response.message}\n> ")
+                print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
         except Exception as e:
-            print(f"Error requesting song: {e}\n> ")
+            print(f"Error requesting song: {e}\n> ", end="")
 
     async def pull_updates(self, stub):
         with open('../logs/pull_updates.log', 'w') as f:
@@ -172,6 +172,7 @@ class NapsterClient:
             task_command_interface = asyncio.create_task(self.command_interface(stub))
 
             await task_command_interface
+            os.system("sudo ufw delete allow {port_number}/tcp; sudo ufw enable")
             
             task_heartbeat.cancel()
             task_pull_updates.cancel()
@@ -183,9 +184,9 @@ class NapsterClient:
             # await asyncio.gather(task_command_interface, task_heartbeat, task_pull_updates, task_monitor_directory)
 
         except grpc.aio.AioRpcError as e:
-            print(f"gRPC connection error: {e}\n> ")
+            print(f"gRPC connection error: {e}\n> ", end="")
         except Exception as e:
-            print(f"General error: {e}\n> ")
+            print(f"General error: {e}\n> ", end="")
         finally:
             await channel.close()  # Close the channel manually when done
     
@@ -202,7 +203,7 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
             client_socket.send(b"CONNECT")
             response = client_socket.recv(1024).decode()
             if not response.startswith("ACK"):            
-                print(f"Server response: {response}.Try Again.\n> ")
+                print(f"Server response: {response}.Try Again.\n> ", end="")
                 return
             f.write("Connection established with server\n")
             f.flush()
@@ -210,7 +211,7 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
             client_socket.send(file_name.encode())
             response = client_socket.recv(32).decode()
             if response.startswith("ERROR"):
-                print(f"Server response: {response}.Try Again.\n> ")
+                print(f"Server response: {response}.Try Again.\n> ", end="")
                 return
             f.write(f"Server response: {response}\n")
             f.flush()
@@ -220,9 +221,9 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
                 while (data := client_socket.recv(1024)):
                     file.write(data)
         
-            print(f"File has been received and saved in your music directory as {save_as}\n> ")
+            print(f"File has been received and saved in your music directory as {save_as}\n> ", end="")
         except Exception as e:
-            print(f"Error: {e}.Try Again.\n> ")
+            print(f"Error: {e}.Try Again.\n> ", end="")
         finally:
             client_socket.close()
       
@@ -275,6 +276,7 @@ async def start_server(host='0.0.0.0', port=12345):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, 0)) 
         port_number = s.getsockname()[1] 
+    os.system("sudo ufw allow {port_number}/tcp; sudo ufw enable")
     # print(f"Server is listening on port {port_number}")
     server = await asyncio.start_server(handle_peer_requests, host, port_number)
     async with server:
