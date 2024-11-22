@@ -119,12 +119,15 @@ class NapsterClient:
                 current_songs = set(os.listdir(self.music_dir))
                 new_songs = current_songs - self.local_songs
                 deleted_songs = self.local_songs - current_songs
-                f.write(f"local songs:{self.local_songs}\n")
-                f.write(f"current songs:{current_songs}\n")
+                
+                f.write(f"Current songs in music directory: {os.listdir(self.music_dir)}\n")
+                f.write(f"Current songs in local_songs: {self.local_songs}\n")
                 f.flush()
+
                 for song in new_songs:
                     await self.add_song(stub, song)
-                    self.external_songs.remove(song)
+                    if(song in self.external_songs):
+                        self.external_songs.remove(song)
                 for song in deleted_songs:
                     await self.delete_song(stub, song)
 
