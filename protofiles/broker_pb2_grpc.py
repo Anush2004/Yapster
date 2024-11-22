@@ -39,10 +39,10 @@ class NapsterServiceStub(object):
                 request_serializer=broker__pb2.ClientInfo.SerializeToString,
                 response_deserializer=broker__pb2.Ack.FromString,
                 _registered_method=True)
-        self.InitializeClient = channel.stream_unary(
+        self.InitializeClient = channel.stream_stream(
                 '/NapsterService/InitializeClient',
                 request_serializer=broker__pb2.SongUpdate.SerializeToString,
-                response_deserializer=broker__pb2.SongUpdateResponse.FromString,
+                response_deserializer=broker__pb2.Update.FromString,
                 _registered_method=True)
         self.Leave = channel.unary_unary(
                 '/NapsterService/Leave',
@@ -63,6 +63,11 @@ class NapsterServiceStub(object):
                 '/NapsterService/DeleteSong',
                 request_serializer=broker__pb2.SongUpdate.SerializeToString,
                 response_deserializer=broker__pb2.SongUpdateResponse.FromString,
+                _registered_method=True)
+        self.PullUpdates = channel.unary_stream(
+                '/NapsterService/PullUpdates',
+                request_serializer=broker__pb2.ClientInfo.SerializeToString,
+                response_deserializer=broker__pb2.Update.FromString,
                 _registered_method=True)
 
 
@@ -106,6 +111,12 @@ class NapsterServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PullUpdates(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NapsterServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -114,10 +125,10 @@ def add_NapsterServiceServicer_to_server(servicer, server):
                     request_deserializer=broker__pb2.ClientInfo.FromString,
                     response_serializer=broker__pb2.Ack.SerializeToString,
             ),
-            'InitializeClient': grpc.stream_unary_rpc_method_handler(
+            'InitializeClient': grpc.stream_stream_rpc_method_handler(
                     servicer.InitializeClient,
                     request_deserializer=broker__pb2.SongUpdate.FromString,
-                    response_serializer=broker__pb2.SongUpdateResponse.SerializeToString,
+                    response_serializer=broker__pb2.Update.SerializeToString,
             ),
             'Leave': grpc.unary_unary_rpc_method_handler(
                     servicer.Leave,
@@ -138,6 +149,11 @@ def add_NapsterServiceServicer_to_server(servicer, server):
                     servicer.DeleteSong,
                     request_deserializer=broker__pb2.SongUpdate.FromString,
                     response_serializer=broker__pb2.SongUpdateResponse.SerializeToString,
+            ),
+            'PullUpdates': grpc.unary_stream_rpc_method_handler(
+                    servicer.PullUpdates,
+                    request_deserializer=broker__pb2.ClientInfo.FromString,
+                    response_serializer=broker__pb2.Update.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -188,12 +204,12 @@ class NapsterService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.stream_unary(
+        return grpc.experimental.stream_stream(
             request_iterator,
             target,
             '/NapsterService/InitializeClient',
             broker__pb2.SongUpdate.SerializeToString,
-            broker__pb2.SongUpdateResponse.FromString,
+            broker__pb2.Update.FromString,
             options,
             channel_credentials,
             insecure,
@@ -302,6 +318,33 @@ class NapsterService(object):
             '/NapsterService/DeleteSong',
             broker__pb2.SongUpdate.SerializeToString,
             broker__pb2.SongUpdateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullUpdates(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/NapsterService/PullUpdates',
+            broker__pb2.ClientInfo.SerializeToString,
+            broker__pb2.Update.FromString,
             options,
             channel_credentials,
             insecure,

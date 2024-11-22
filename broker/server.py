@@ -25,9 +25,11 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
     async def InitializeClient(self, request_iterator, context):
         first_message = True
         client_id = None
+        print("Initializing client...")
         async for update in request_iterator:
             if first_message:
                 # Use the first message to register the client
+                print(f"Registering client {update.client_id}")
                 client_id = update.client_id
                 if client_id in self.clients:
                     yield broker_pb2.Update(type="error", song_name="Client already exists.")
@@ -124,7 +126,7 @@ async def serve():
         server = grpc.aio.server()
         broker = Broker()
         broker_pb2_grpc.add_NapsterServiceServicer_to_server(broker, server)
-        server.add_insecure_port('[::]:50051')
+        server.add_insecure_port('0.0.0.0:50051')
 
         # Start the cleanup coroutine
         asyncio.create_task(cleanup_clients(broker))

@@ -12,7 +12,7 @@ import broker_pb2
 import broker_pb2_grpc
 
 class NapsterClient:
-    def __init__(self, client_id, server_address='192.168.2.220:50051', music_dir="music"):
+    def __init__(self, client_id, server_address='192.168.2.140:12345', music_dir="music"):
         self.client_id = client_id
         self.server_address = server_address
         self.music_dir = music_dir
@@ -37,15 +37,17 @@ class NapsterClient:
         async def song_update_stream():
             for song_name in self.local_songs:
                 yield broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name)
-        try:
-            async for update in stub.InitializeClient(song_update_stream()):
-                if update.type == "error":
-                    print(f"Error during initialization: {update.song_name}")
-                    return
-                if update.type == "add":
-                    self.external_songs.add(update.song_name)
-        except Exception as e:
-            print(f"Error during initialization: {e}")
+                await asyncio.sleep(0.1)
+        # try:    
+        async for update in stub.InitializeClient(song_update_stream()):
+            print(f"Received update: {update.type} - {update.song_name}")
+            if update.type == "error":
+                print(f"Error during initialization: {update.song_name}")
+                return
+            if update.type == "add":
+                self.external_songs.add(update.song_name)
+        # except Exception as e:
+        #     print(f"Error during initialization: {e}")
 
     async def leave(self, stub):
         try:
@@ -109,16 +111,21 @@ class NapsterClient:
         print("Interactive mode started. Type 'help' for a list of commands.")
         while True:
             command = input("> ").strip().lower()
-            if command == "list":
+            if command == "list_mine":
                 print("Current songs in your music directory:")
                 for song in sorted(self.local_songs):
+                    print(f"- {song}")
+            elif command == "list_others":
+                print("Current songs in the network:")
+                for song in sorted(self.external_songs):
                     print(f"- {song}")
             elif command.startswith("request "):
                 song_name = command.split(" ", 1)[1]
                 await self.song_request(stub, song_name)
             elif command == "help":
                 print("Available commands:")
-                print("  list          - List all songs in your music directory")
+                print("  lis_mine          - List all songs in your music directory")
+                print("  list_others       - List all songs available in the network")
                 print("  request <song> - Request a song from the broker")
                 print("  help          - Show this help message")
                 print("  exit          - Exit the client")
@@ -151,7 +158,7 @@ class NapsterClient:
 
 if __name__ == "__main__":
     client_id = input("Enter client ID: ")
-    music_directory = "music"
+    music_directory = "../music"
 
     if not os.path.exists(music_directory):
         print("Music directory not found. Please create a 'music' directory in the current folder.")
