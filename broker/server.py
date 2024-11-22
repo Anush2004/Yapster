@@ -103,6 +103,10 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                 for client_id, queue in self.client_queues.items():
                     if client_id != request.client_id:
                         await queue.put(broker_pb2.Update(type="delete", song_name=request.song_name))
+            else:
+                for client_id, queue in self.client_queues.items():
+                    if client_id == request.client_id:
+                        await queue.put(broker_pb2.Update(type="add", song_name=request.song_name))        
             return broker_pb2.SongUpdateResponse(success=True, message="Song deleted.")
         return broker_pb2.SongUpdateResponse(success=False, message="Song not found.")
 
