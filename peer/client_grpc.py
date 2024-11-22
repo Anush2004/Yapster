@@ -60,33 +60,33 @@ class NapsterClient:
     async def leave(self, stub):
         try:
             response = await stub.Leave(broker_pb2.ClientInfo(client_id=self.client_id))
-            print(f"Leave response: {response.success}")
+            print(f"Leave response: {response.success}\n> ")
         except Exception as e:
-            print(f"Error during leave: {e}")
+            print(f"Error during leave: {e}\n> ")
 
     async def add_song(self, stub, song_name):
         try:
             response = await stub.AddSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
-            print(f"Add song response: {response.message}")
+            print(f"Add song response: {response.message}\n> ")
         except Exception as e:
-            print(f"Error adding song: {e}")
+            print(f"Error adding song: {e}\n> ")
 
     async def delete_song(self, stub, song_name):
         try:
             response = await stub.DeleteSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
-            print(f"Delete song response: {response.message}")
+            print(f"Delete song response: {response.message}\n> ")
         except Exception as e:
-            print(f"Error deleting song: {e}")
+            print(f"Error deleting song: {e}\n> ")
 
     async def song_request(self, stub, song_name):
         try:
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
-                print(f"Song '{song_name}' found on client: {response.client_id}.")
+                print(f"Song '{song_name}' found on client: {response.client_id}.\n> ")
             else:
-                print(f"Song '{song_name}' not found. Message: {response.message}")
+                print(f"Song '{song_name}' not found. Message: {response.message}\n> ")
         except Exception as e:
-            print(f"Error requesting song: {e}")
+            print(f"Error requesting song: {e}\n> ")
 
     async def pull_updates(self, stub):
         with open('../logs/pull_updates.log', 'w') as f:
