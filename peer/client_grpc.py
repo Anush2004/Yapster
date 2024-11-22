@@ -10,9 +10,10 @@ pwd = pwd + '/protofiles'
 sys.path.append(pwd)
 import broker_pb2
 import broker_pb2_grpc
+import aioconsole
 
 class NapsterClient:
-    def __init__(self, client_id, server_address='192.168.2.220:4000', music_dir="music"):
+    def __init__(self, client_id, server_address='192.168.2.220:4018', music_dir="music"):
         self.client_id = client_id
         self.server_address = server_address
         self.music_dir = music_dir
@@ -20,16 +21,19 @@ class NapsterClient:
         self.external_songs = set()
 
     async def heartbeat(self, stub):
-        while True:
-            try:
+        # print("Starting heartbeat function")
+        with open('logs/heartbeat.log', 'w') as f:
+            while True:
+                # try:
+                # print("Sending Heartbeat")
                 response = await stub.Heartbeat(broker_pb2.ClientInfo(client_id=self.client_id))
                 if response.success:
-                    print(f"Heartbeat sent for client {self.client_id}.")
+                    f.write(f"Heartbeat sent for client {self.client_id}.")
                 else:
-                    print(f"Heartbeat failed for client {self.client_id}.")
-            except Exception as e:
-                print(f"Error sending heartbeat: {e}")
-            await asyncio.sleep(2)  # Send heartbeat every 5 seconds
+                    f.write(f"Heartbeat failed for client {self.client_id}.")
+                # except Exception as e:
+                    # print(f"Error sending heartbeat: {e}")
+                await asyncio.sleep(4)  # Send heartbeat every 5 seconds
 
     async def initialize_client(self, stub):
         # Load initial songs from the music directory
@@ -38,9 +42,9 @@ class NapsterClient:
         async def song_update_stream():
             yield broker_pb2.SongUpdate(client_id=self.client_id)
             for song_name in self.local_songs:
-                print(song_name)
+                # print(song_name)
                 yield broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name)
-                await asyncio.sleep(0.1)
+                # await asyncio.sleep(0.1)
         # try:    
         async for update in stub.InitializeClient(song_update_stream()):
             print(f"Received update: {update.type} - {update.song_name}")
@@ -84,36 +88,40 @@ class NapsterClient:
             print(f"Error requesting song: {e}")
 
     async def pull_updates(self, stub):
-        try:
-            async for update in stub.PullUpdates(broker_pb2.ClientInfo(client_id=self.client_id)):
-                print(f"Received update: {update.type} - {update.song_name}")
-                if(update.type == "add"):
-                    self.external_songs.add(update.song_name)
-                elif(update.type == "delete"):
-                    self.external_songs.remove(update.song_name)
-        except Exception as e:
-            print(f"Error pulling updates: {e}")
+        with open('logs/pull_updates.log', 'w') as f:
+            try:
+                async for update in stub.PullUpdates(broker_pb2.ClientInfo(client_id=self.client_id)):
+                    f.write(f"Received update: {update.type} - {update.song_name}")
+                    if(update.type == "add"):
+                        self.external_songs.add(update.song_name)
+                    elif(update.type == "delete"):
+                        self.external_songs.remove(update.song_name)
+            except Exception as e:
+                f.write(f"Error pulling updates: {e}")
 
     async def monitor_directory(self, stub):
         """Monitors the music directory for changes and synchronizes with the broker."""
-        while True:
-            current_songs = set(os.listdir(self.music_dir))
-            new_songs = current_songs - self.local_songs
-            deleted_songs = self.local_songs - current_songs
+        with open('logs/monitor_directory.log', 'w') as f:
+            while True:
+                current_songs = set(os.listdir(self.music_dir))
+                new_songs = current_songs - self.local_songs
+                deleted_songs = self.local_songs - current_songs
 
-            for song in new_songs:
-                await self.add_song(stub, song)
-            for song in deleted_songs:
-                await self.delete_song(stub, song)
+                for song in new_songs:
+                    await self.add_song(stub, song)
+                for song in deleted_songs:
+                    await self.delete_song(stub, song)
 
-            self.local_songs = current_songs
-            await asyncio.sleep(2)  # Check for changes every 2 seconds
-
+                self.local_songs = current_songs
+                await asyncio.sleep(2)  # Check for changes every 2 seconds
+            
     async def command_interface(self, stub):
         """Handles interactive commands from the user."""
         print("Interactive mode started. Type 'help' for a list of commands.")
         while True:
-            command = input("> ").strip().lower()
+            command = await aioconsole.ainput("> ")  # Await the asynchronous input
+            command = command.strip().lower()  # Now strip and lower the input
+
             if command == "list_mine":
                 print("Current songs in your music directory:")
                 for song in sorted(self.local_songs):
@@ -127,7 +135,7 @@ class NapsterClient:
                 await self.song_request(stub, song_name)
             elif command == "help":
                 print("Available commands:")
-                print("  lis_mine          - List all songs in your music directory")
+                print("  list_mine          - List all songs in your music directory")
                 print("  list_others       - List all songs available in the network")
                 print("  request <song> - Request a song from the broker")
                 print("  help          - Show this help message")
@@ -139,24 +147,50 @@ class NapsterClient:
             else:
                 print("Unknown command. Type 'help' for a list of commands.")
 
+
+    # async def run(self):
+    #     async with grpc.aio.insecure_channel(self.server_address) as channel:
+    #         stub = broker_pb2_grpc.NapsterServiceStub(channel)
+
+    #         # Initialize client
+    #         await self.initialize_client(stub)
+
+    #         # Start the heartbeat in the background
+    #         asyncio.create_task(self.heartbeat(stub))
+
+    #         # Start pulling updates in the background
+    #         asyncio.create_task(self.pull_updates(stub))
+
+    #         # Monitor the directory for changes
+    #         asyncio.create_task(self.monitor_directory(stub))
+
+    #         # Start the interactive command interface
+    #         # await self.command_interface(stub)
+    
     async def run(self):
-        async with grpc.aio.insecure_channel(self.server_address) as channel:
+        try:
+            channel = grpc.aio.insecure_channel(self.server_address)
             stub = broker_pb2_grpc.NapsterServiceStub(channel)
 
             # Initialize client
             await self.initialize_client(stub)
 
-            # Start the heartbeat in the background
-            asyncio.create_task(self.heartbeat(stub))
+            # Start other tasks
+            task_heartbeat = asyncio.create_task(self.heartbeat(stub))
+            task_pull_updates = asyncio.create_task(self.pull_updates(stub))
+            task_monitor_directory = asyncio.create_task(self.monitor_directory(stub))
+            task_command_interface = asyncio.create_task(self.command_interface(stub))
 
-            # Start pulling updates in the background
-            asyncio.create_task(self.pull_updates(stub))
+            # await task_command_interface
+            await asyncio.gather(task_command_interface, task_heartbeat, task_pull_updates, task_monitor_directory)
 
-            # Monitor the directory for changes
-            asyncio.create_task(self.monitor_directory(stub))
+        except grpc.aio.AioRpcError as e:
+            print(f"gRPC connection error: {e}")
+        except Exception as e:
+            print(f"General error: {e}")
+        finally:
+            await channel.close()  # Close the channel manually when done
 
-            # Start the interactive command interface
-            await self.command_interface(stub)
 
 
 if __name__ == "__main__":
