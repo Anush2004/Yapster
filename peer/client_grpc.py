@@ -131,7 +131,7 @@ class NapsterClient:
             
     async def command_interface(self, stub):
         """Handles interactive commands from the user."""
-        print("Interactive mode started. Type 'help' for a list of commands.")
+        print("Interactive mode started")
         await asyncio.sleep(5) # Sleep for a bit to avoid spamming the console
         print()
         print("Available commands:")
