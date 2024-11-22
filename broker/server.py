@@ -19,6 +19,7 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         self.client_queues = defaultdict(asyncio.Queue)  # {client_id: asyncio.Queue}
 
     async def Heartbeat(self, request, context):
+        print(f"Heartbeat received for client {request.client_id}.")
         self.clients[request.client_id] = time.time()
         return broker_pb2.Ack(success=True)
 
@@ -105,11 +106,12 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         return broker_pb2.SongUpdateResponse(success=False, message="Song not found.")
 
     async def PullUpdates(self, request, context):
+        print(f"Pulling updates for client {request.client_id}.")
         while True:
             item = await self.client_queues[request.client_id].get()
             yield item
     
-async def cleanup_clients(broker, interval=10, timeout=30):
+async def cleanup_clients(broker, interval=10, timeout=10):
     while True:
         await asyncio.sleep(interval)
         current_time = time.time()
@@ -134,12 +136,12 @@ async def serve():
         server = grpc.aio.server()
         broker = Broker()
         broker_pb2_grpc.add_NapsterServiceServicer_to_server(broker, server)
-        server.add_insecure_port('0.0.0.0:4000')
+        server.add_insecure_port('0.0.0.0:4018')
 
         # Start the cleanup coroutine
         asyncio.create_task(cleanup_clients(broker))
 
-        print("Server starting on port 4000...")
+        print("Server starting on port 4018...")
         await server.start()
         await server.wait_for_termination()
     except Exception as e:
