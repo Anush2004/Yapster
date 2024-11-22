@@ -172,7 +172,7 @@ class NapsterClient:
             task_command_interface = asyncio.create_task(self.command_interface(stub))
 
             await task_command_interface
-            os.system("sudo ufw delete allow {port_number}/tcp; sudo ufw enable")
+            os.system(f"sudo ufw delete allow {port_number}/tcp; sudo ufw enable")
             
             task_heartbeat.cancel()
             task_pull_updates.cancel()
@@ -276,7 +276,7 @@ async def start_server(host='0.0.0.0', port=12345):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind((host, 0)) 
         port_number = s.getsockname()[1] 
-    os.system("sudo ufw allow {port_number}/tcp; sudo ufw enable")
+    os.system(f"sudo ufw allow {port_number}/tcp; sudo ufw enable")
     # print(f"Server is listening on port {port_number}")
     server = await asyncio.start_server(handle_peer_requests, host, port_number)
     async with server:
