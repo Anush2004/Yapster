@@ -115,11 +115,13 @@ class NapsterClient:
     async def monitor_directory(self, stub):
         """Monitors the music directory for changes and synchronizes with the broker."""
         with open('../logs/monitor_directory.log', 'w') as f:
-            while True:
+            while True:                
                 current_songs = set(os.listdir(self.music_dir))
                 new_songs = current_songs - self.local_songs
                 deleted_songs = self.local_songs - current_songs
-
+                f.write(f"local songs:{self.local_songs}\n")
+                f.write(f"current songs:{current_songs}\n")
+                f.flush()
                 for song in new_songs:
                     await self.add_song(stub, song)
                     self.external_songs.remove(song)
