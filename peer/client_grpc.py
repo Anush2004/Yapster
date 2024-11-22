@@ -132,15 +132,15 @@ class NapsterClient:
     async def command_interface(self, stub):
         """Handles interactive commands from the user."""
         print("Interactive mode started. Type 'help' for a list of commands.")
+        await asyncio.sleep(5) # Sleep for a bit to avoid spamming the console
+        print()
+        print("Available commands:")
+        print("  list_mine      - List all songs in your music directory")
+        print("  list_others    - List all songs available in the network")
+        print("  request <song> - Request a song from the broker")
+        print("  help           - Show this help message")
+        print("  exit           - Exit the client")
         while True:
-            await asyncio.sleep(2) # Sleep for a bit to avoid spamming the console
-            print()
-            print("Available commands:")
-            print("  list_mine      - List all songs in your music directory")
-            print("  list_others    - List all songs available in the network")
-            print("  request <song> - Request a song from the broker")
-            print("  help           - Show this help message")
-            print("  exit           - Exit the client")
             command = await aioconsole.ainput("> ")  # Await the asynchronous input
             command = command.strip().lower()  # Now strip and lower the input
 
