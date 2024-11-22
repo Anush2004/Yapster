@@ -199,7 +199,6 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
         f.flush()
     
         try:
-        # Send connection request
             client_socket.send(b"CONNECT")
             response = client_socket.recv(1024).decode()
             if not response.startswith("ACK"):            
@@ -217,6 +216,7 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
             f.flush()
             
             # Receive file
+            save_as = os.path.join(music_directory, save_as)
             with open(save_as, 'wb') as file:
                 while (data := client_socket.recv(1024)):
                     file.write(data)
