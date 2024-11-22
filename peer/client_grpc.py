@@ -11,7 +11,11 @@ sys.path.append(pwd)
 import broker_pb2
 import broker_pb2_grpc
 import aioconsole
+import threading
+import socket
 
+music_directory = "../music"
+port_number = None
 class NapsterClient:
     def __init__(self, client_id, server_address='192.168.2.220:4018', music_dir="music"):
         self.client_id = client_id
@@ -83,6 +87,9 @@ class NapsterClient:
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
                 print(f"Song '{song_name}' found on client: {response.client_id}.\n> ")
+                ip_address = response.client_id.split(":")[0]
+                port = response.client_id.split(":")[1]
+                request_file_from_peer(ip_address = ip_address,port=port,file_name=song_name, save_as=song_name)
             else:
                 print(f"Song '{song_name}' not found. Message: {response.message}\n> ")
         except Exception as e:
@@ -180,13 +187,113 @@ class NapsterClient:
             print(f"General error: {e}")
         finally:
             await channel.close()  # Close the channel manually when done
+ 
+def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='shared_file.txt', save_as='received_file.txt'):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print(f"Connecting to server at {server_ip}:{port}")
+    client_socket.connect((server_ip, port))
+    print(f"Connected to server at {server_ip}:{port}")
 
+    try:
+        # Send connection request
+        client_socket.send(b"CONNECT")
+        response = client_socket.recv(1024).decode()
+        if not response.startswith("ACK"):
+            print(f"Server response: {response}")
+            return
+        print("Connection established with server")
+        
+        # Request file
+        client_socket.send(file_name.encode())
+        response = client_socket.recv(32).decode()
+        if response.startswith("ERROR"):
+            print(f"Server response: {response}")
+            return
+        print(f"Server response: {response}")
+        
+        # Receive file
+        with open(save_as, 'wb') as file:
+            while (data := client_socket.recv(1024)):
+                file.write(data)
+        print(f"File received and saved as {save_as}")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        client_socket.close()
+      
+async def handle_peer_requests(reader, writer):
+    addr = writer.get_extra_info('peername')
+    print(f"Connection established with {addr}")
+    try:
+        # Receive initial connection request
+        init_request = await reader.read(1024)
+        if init_request.decode() != "CONNECT":
+            print("Invalid connection request")
+            writer.write(b"ERROR: Invalid connection request")
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+            return
+        
+        writer.write(b"ACK: Connection established")
+        await writer.drain()
+        
+        # Receive file request
+        file_request = await reader.read(1024)
+        file_request = os.path.join(music_directory, file_request.decode().strip())
+        print(f"Client requested file: {file_request}")
+        
+        if os.path.exists(file_request):
+            writer.write(b"ACK: File found. Sending file...")
+            await writer.drain()
+            
+            # Send the file in chunks
+            with open(file_request, 'rb') as file:
+                while chunk := file.read(1024):
+                    writer.write(chunk)
+                    await writer.drain()
+            print("File sent successfully.")
+        else:
+            writer.write(b"ERROR: File not found")
+            await writer.drain()
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        writer.close()
+        await writer.wait_closed()
 
+async def start_server(host='0.0.0.0', port=12345):
+    global port_number
+    server = await asyncio.start_server(handle_peer_requests, host, port)
+    addr1 = server.sockets[0].getsockname()
+    print(f"Server is listening on {addr1}")
+    port_number = addr1[1]
+    async with server:
+        await server.serve_forever()
 
+def start_peer_server():
+    asyncio.run(start_server())
+
+def find_ip_address():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8",80))
+            ip_address = s.getsockname()[0]
+        return ip_address
+    except Exception as e:
+        print(f"Error finding IP address: {e}")
+        return None
+    
 if __name__ == "__main__":
-    client_id = input("Enter client ID: ")
-    music_directory = "../music"
-
+    thread = threading.Thread(target = start_peer_server,daemon = True)
+    thread.start()
+    
+    while(port_number == None):
+        pass
+    # ip address  + port number
+    ip_address = find_ip_address()
+    client_id = str(ip_address) + ":" + str(port_number)
+    
     if not os.path.exists(music_directory):
         print("Music directory not found. Please create a 'music' directory in the current folder.")
         sys.exit(1)
