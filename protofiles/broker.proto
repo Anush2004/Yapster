@@ -1,0 +1,58 @@
+//heartbeat -> updtes client view of songs and existence of client on server
+// intiatization -> new client arrival
+// leave -> client gracefully exits
+// song request -> client requests a song
+// add song -> client adds a new song
+// delete song -> only after async updation of all clients of present view
+
+// broker -> list of known songs with a list of clients having that songs
+//          list of clients 
+//          queue for each client which they we add updates for clients to pull it out and update their view
+//
+// 
+
+syntax = "proto3";
+
+service NapsterService {
+    rpc Heartbeat(ClientInfo) returns (Ack);
+    rpc InitializeClient(stream SongUpdate) returns (SongUpdateResponse);
+    rpc Leave(ClientInfo) returns (Ack); //graceful leave
+    rpc SongRequest(SongRequestMessage) returns (SongResponse);
+    rpc AddSong(SongUpdate) returns (SongUpdateResponse);
+    rpc DeleteSong(SongUpdate) returns (SongUpdateResponse);
+    rpc PullUpdates(ClientInfo) returns (stream Update);
+}
+
+message ClientInfo {
+    string client_id = 1;
+}
+
+message Ack {
+    bool success = 1;
+}
+
+message SongRequestMessage {
+    string song_name = 1;
+    string client_id = 2;
+}
+
+message SongResponse {
+    string client_id = 1;
+    bool found = 2;
+    string message = 3;
+}
+
+message SongUpdate {
+    string client_id = 1;
+    string song_name = 2;
+}
+
+message Update {
+    string song_name = 1;
+    string type = 2;
+}
+message SongUpdateResponse {
+    bool success = 1;
+    string message = 2;
+}
+
