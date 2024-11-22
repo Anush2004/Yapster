@@ -184,6 +184,14 @@ class NapsterClient:
             task_command_interface = asyncio.create_task(self.command_interface(stub))
 
             await task_command_interface
+            
+            task_heartbeat.cancel()
+            task_pull_updates.cancel()
+            task_monitor_directory.cancel()
+
+            # Optionally wait for tasks to exit cleanly
+            await asyncio.gather(task_heartbeat, task_pull_updates, task_monitor_directory, return_exceptions=True)
+
             # await asyncio.gather(task_command_interface, task_heartbeat, task_pull_updates, task_monitor_directory)
 
         except grpc.aio.AioRpcError as e:
