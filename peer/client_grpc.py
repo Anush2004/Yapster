@@ -13,9 +13,14 @@ import broker_pb2_grpc
 import aioconsole
 import threading
 import socket
+import math  
+from collections import defaultdict
 
+
+demand_lock = threading.Lock()
 music_directory = "../music"
 port_number = None
+current_demand = 0
 class NapsterClient:
     def __init__(self, client_id, server_address='192.168.2.220:4018', music_dir="music"):
         self.client_id = client_id
@@ -30,7 +35,7 @@ class NapsterClient:
             while True:
                 # try:
                 # print("Sending Heartbeat")
-                response = await stub.Heartbeat(broker_pb2.ClientInfo(client_id=self.client_id))
+                response = await stub.HeartbeatRequest(broker_pb2.ClientInfo(client_id=self.client_id,demand = current_demand ))
                 if response.success:
                     f.write(f"Heartbeat sent for client {self.client_id}.\n")
                 else:
@@ -79,6 +84,16 @@ class NapsterClient:
             # print(f"Delete song response: {response.message}\n> ", end="")
         except Exception as e:
             print(f"Error deleting song: {e}\n> ", end="")
+    
+    async def request_for_song(self, song_name, response):
+        # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
+        client_dict = dict(eval(response.client_id))
+        print(f"Song '{song_name}' found. Requesting file...")
+        ip_address = response.client_id.split(":")[0]
+        port = int(response.client_id.split(":")[1])
+        # print("Going to request")
+        request_file_from_peers(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+        print("File received successfully")
 
     async def song_request(self, stub, song_name):
         try:
@@ -87,13 +102,8 @@ class NapsterClient:
                 return
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
-                # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
-                print(f"Song '{song_name}' found. Requesting file...")
-                ip_address = response.client_id.split(":")[0]
-                port = int(response.client_id.split(":")[1])
-                # print("Going to request")
-                request_file_from_peer(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
-                print("File received successfully")
+                
+                
             else:
                 print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
         except Exception as e:
@@ -244,13 +254,119 @@ def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='sha
             print(f"Error: {e}.Try Again")
         finally:
             client_socket.close()
-      
+
+async def request_metadata(client_info, file_name):
+    ip_port, demand = client_info
+    if demand >= 100:
+        return None  # Skip clients with demand >= 100
+    try:
+        reader, writer = await asyncio.open_connection(*ip_port.split(':'))
+        writer.write(b"METADATA")
+        await writer.drain()
+        writer.write(file_name.encode())
+        await writer.drain()
+
+        response = await asyncio.wait_for(reader.read(1024), timeout=5)  # Timeout for metadata request
+        if response.startswith(b"ERROR"):
+            return None
+        file_size = int(response.decode())
+        writer.close()
+        await writer.wait_closed()
+        return ip_port, file_size
+    except Exception as e:
+        # print(f"Error requesting metadata from {ip_port}: {e}")
+        return None
+
+async def request_file_clipping(client_info, file_name, offset, size, timeout=10):
+    ip_port, demand = client_info
+    try:
+        reader, writer = await asyncio.open_connection(*ip_port.split(':'))
+        writer.write(b"REQUEST")
+        await writer.drain()
+        writer.write(f"{file_name}:{offset}:{size}".encode())
+        await writer.drain()
+
+        received_data = b""
+        last_receive_time = asyncio.get_event_loop().time()
+        while len(received_data) < size:
+            try:
+                chunk = await asyncio.wait_for(reader.read(1024), timeout=timeout)
+                if not chunk:
+                    break
+                received_data += chunk
+                last_receive_time = asyncio.get_event_loop().time()
+            except asyncio.TimeoutError:
+                if asyncio.get_event_loop().time() - last_receive_time > timeout:
+                    raise TimeoutError("Client timed out during file transfer")
+        
+        writer.close()
+        await writer.wait_closed()
+        if len(received_data) == size:
+            return ip_port, received_data
+        else:
+            raise ValueError("Incomplete data received")
+    except Exception as e:
+        print(f"Error requesting file clipping from {ip_port}: {e}")
+        return None
+
+async def download_file(clients_dict, file_name):
+    save_path = os.path.join(music_directory, file_name)
+    client_results = {client: 0 for client in clients_dict.keys()}  # 0 for clients not requested
+    metadata_results = await asyncio.gather(
+        *(request_metadata(client_info, file_name) for client_info in clients_dict.items())
+    )
+    metadata_results = [result for result in metadata_results if result is not None]
+
+    # Calculate clippings based on demands
+    total_demand = sum(demand for _, demand in clients_dict.items())
+    offsets_sizes = {}
+    offset =0
+    active_addresses = []
+    for ip_port, file_size in metadata_results:
+        client_demand = clients_dict[ip_port]
+        size = math.ceil((client_demand / total_demand) * file_size)
+        offsets_sizes[ip_port] = (size, offset)  # size, offset
+        offset += size
+        active_addresses.append(ip_port)
+        # total_demand -= client_demand
+        # file_size -= size
+    
+    # Request file clippings asynchronously
+    remaining_data = defaultdict(bytes)
+    unattained_files = []
+    async def handle_clipping(client_info):
+        ip_port, (size, offset) = client_info
+        result = await request_file_clipping((ip_port, clients_dict[ip_port]), file_name, offset, size)
+        if result is not None:
+            ip_port, data = result
+            remaining_data[ip_port] = data
+            client_results[ip_port] = 1  # File sent completely
+        else:
+            active_addresses.remove(ip_port)
+            client_results[ip_port] = -1  # File not sent completely
+            unattained_files.append((size, offset))
+            
+
+    await asyncio.gather(*(handle_clipping(info) for info in offsets_sizes.items()))
+
+    # Combine file parts and save
+    with open(save_path, 'wb') as f:
+        for ip_port in metadata_results:
+            if ip_port in remaining_data:
+                f.write(remaining_data[ip_port])
+
+    return client_results
+     
 async def handle_peer_requests(reader, writer):
     with open('../logs/peer_server.log', 'w') as f:
+        global current_demand
         addr = writer.get_extra_info('peername')
         f.write(f"Connection established with {addr}\n")
         f.flush()
         try:
+            demand_lock.acquire()
+            current_demand += 1
+            demand_lock.release()
             # Receive initial connection request
             init_request = await reader.read(1024)
             if init_request.decode() != "CONNECT":
@@ -259,6 +375,9 @@ async def handle_peer_requests(reader, writer):
                 await writer.drain()
                 writer.close()
                 await writer.wait_closed()
+                demand_lock.acquire()
+                current_demand -= 1
+                demand_lock.release()
                 return
             
             writer.write(b"ACK: Connection established")
@@ -284,10 +403,16 @@ async def handle_peer_requests(reader, writer):
                 writer.write(b"ERROR: File not found")
                 await writer.drain()
         except Exception as e:
+            demand_lock.acquire()
+            current_demand -= 1
+            demand_lock.release()
             print(f"Error: {e}\n>")
         finally:
             writer.close()
             await writer.wait_closed()
+            demand_lock.acquire()
+            current_demand -= 1
+            demand_lock.release()
 
 async def start_server(host='0.0.0.0', port=12345):
     global port_number
