@@ -291,7 +291,7 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
         last_receive_time = asyncio.get_event_loop().time()
         while len(received_data) < size:
             try:
-                chunk = await asyncio.wait_for(reader.read(1024), timeout=timeout)
+                chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
                 if not chunk:
                     break
                 received_data += chunk
@@ -449,14 +449,18 @@ async def handle_peer_requests(reader, writer):
 
         try:
             # Increment demand safely
-            with demand_lock:
-                current_demand += 1
+            demand_lock.acquire()
+            current_demand += 1
+            demand_lock.release()
 
             # Receive initial connection request
             init_request = await reader.read(1024)
             if init_request.decode().strip() != "CONNECT":
                 writer.write(b"ERROR: Invalid connection request")
                 await writer.drain()
+                demand_lock.acquire()
+                current_demand -= 1
+                demand_lock.release()
                 return
             
             writer.write(b"ACK: Connection established")
@@ -517,8 +521,9 @@ async def handle_peer_requests(reader, writer):
             # Clean up and decrement demand safely
             writer.close()
             await writer.wait_closed()
-            with demand_lock:
-                current_demand -= 1
+            demand_lock.acquire()
+            current_demand -= 1
+            demand_lock.release()
             f.write(f"Connection with {addr} closed\n")
             f.flush()
 
