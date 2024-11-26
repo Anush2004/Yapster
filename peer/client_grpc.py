@@ -320,7 +320,7 @@ async def download_file(clients_dict, file_name):
     # Calculate clippings based on demands
     total_demand = sum(demand for _, demand in clients_dict.items())
     offsets_sizes = {}
-    offset =0
+    offset = 0
     active_addresses = []
     for ip_port, file_size in metadata_results:
         client_demand = clients_dict[ip_port]
@@ -330,6 +330,14 @@ async def download_file(clients_dict, file_name):
         active_addresses.append(ip_port)
         # total_demand -= client_demand
         # file_size -= size
+        
+    for ip_port in client_results:
+        if(ip_port not in active_addresses):
+            client_results[ip_port] = -1
+    
+    if(len(active_addresses) == 0):
+        print("File not found. Please try again later.")
+        return client_results
     
     # Request file clippings asynchronously
     remaining_data = defaultdict(bytes)
@@ -339,7 +347,7 @@ async def download_file(clients_dict, file_name):
         result = await request_file_clipping((ip_port, clients_dict[ip_port]), file_name, offset, size)
         if result is not None:
             ip_port, data = result
-            remaining_data[ip_port] = data
+            remaining_data[offset] = data[:size]
             client_results[ip_port] = 1  # File sent completely
         else:
             active_addresses.remove(ip_port)
@@ -348,6 +356,19 @@ async def download_file(clients_dict, file_name):
             
 
     await asyncio.gather(*(handle_clipping(info) for info in offsets_sizes.items()))
+    
+    while(len(unattained_files) > 0):
+        
+        if(len(active_addresses) == 0):
+            print("File not found. Please try again later.")
+            return client_results
+        
+        reassign_dict = {}        
+        for ip_port in active_addresses:
+            size, offset = unattained_files.pop(0)
+            reassign_dict[ip_port] = (size, offset)
+        
+        await asyncio.gather(*(handle_clipping(info) for info in reassign_dict.items()))
 
     # Combine file parts and save
     with open(save_path, 'wb') as f:
@@ -356,7 +377,8 @@ async def download_file(clients_dict, file_name):
                 f.write(remaining_data[ip_port])
 
     return client_results
-     
+ 
+# to update    
 async def handle_peer_requests(reader, writer):
     with open('../logs/peer_server.log', 'w') as f:
         global current_demand
