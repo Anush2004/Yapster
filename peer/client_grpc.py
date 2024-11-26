@@ -261,12 +261,14 @@ async def request_metadata(client_info, file_name):
         return None  # Skip clients with demand >= 100
     try:
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
-        writer.write(b"METADATA")
+        writer.write(b"CONNECT")
+        writer.write(b"MET")
         await writer.drain()
         writer.write(file_name.encode())
         await writer.drain()
-
+        
         response = await asyncio.wait_for(reader.read(1024), timeout=5)  # Timeout for metadata request
+        print(response)
         if response.startswith(b"ERROR"):
             return None
         file_size = int(response.decode())
@@ -274,14 +276,16 @@ async def request_metadata(client_info, file_name):
         await writer.wait_closed()
         return ip_port, file_size
     except Exception as e:
-        # print(f"Error requesting metadata from {ip_port}: {e}")
+        print(f"Error requesting metadata from {ip_port}: {e}")
         return None
 
 async def request_file_clipping(client_info, file_name, offset, size, timeout=10):
     ip_port, demand = client_info
     try:
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
-        writer.write(b"REQUEST")
+        writer.write(b"CONNECT")
+        await writer.drain()
+        writer.write(b"REQ")
         await writer.drain()
         writer.write(f"{file_name}:{offset}:{size}".encode())
         await writer.drain()
@@ -354,12 +358,13 @@ async def download_file(clients_dict, file_name):
         else:
             active_addresses.remove(ip_port)
             client_results[ip_port] = -1  # File not sent completely
-            unattained_files.append((size, offset))
-            
+            unattained_files.append((size, offset))            
 
     await asyncio.gather(*(handle_clipping(info) for info in offsets_sizes.items()))
     
     while(len(unattained_files) > 0):
+        
+        # print(len(unattained_files))
         
         if(len(active_addresses) == 0):
             print("File not found. Please try again later.")
@@ -374,6 +379,8 @@ async def download_file(clients_dict, file_name):
         
         await asyncio.gather(*(handle_clipping(info) for info in reassign_dict.items()))
 
+    print(len(unattained_files))
+    
     # Combine file parts and save
     with open(save_path, 'wb') as f:
         for ip_port in metadata_results:
@@ -456,66 +463,62 @@ async def handle_peer_requests(reader, writer):
         try:
 
             # Receive initial connection request
-            init_request = await reader.read(1024)
+            init_request = await reader.read(7)
             if init_request.decode().strip() != "CONNECT":
                 writer.write(b"ERROR: Invalid connection request")
                 await writer.drain()
-                demand_lock.acquire()
-                current_demand -= 1
-                demand_lock.release()
                 return
             
             writer.write(b"ACK: Connection established")
             await writer.drain()
 
             # Handle metadata or file clipping requests
-            while True:
-                request = await asyncio.wait_for(reader.read(1024), timeout=timeout)
-                if not request:
-                    break
+            request = await asyncio.wait_for(reader.read(3), timeout=timeout)
+            if not request:
+                writer.write(b"ERROR: Request timed out.")
+                return
 
-                request_parts = request.decode().strip().split(":")
-                command = request_parts[0]
+            request_parts = request.decode().strip().split(":")
+            command = request_parts[0]
 
-                if command == "METADATA":
-                    # Respond with file size
-                    file_name = request_parts[1]
-                    file_path = os.path.join(music_directory, file_name)
-                    if os.path.exists(file_path):
-                        file_size = os.path.getsize(file_path)
-                        writer.write(str(file_size).encode())
-                    else:
-                        writer.write(b"ERROR: File not found")
-                    await writer.drain()
-
-                elif command == "REQUEST":
-                    # Handle file clipping
-                    file_name, offset, size = request_parts[1], int(request_parts[2]), int(request_parts[3])
-                    file_path = os.path.join(music_directory, file_name)
-                    if os.path.exists(file_path):
-                        writer.write(b"ACK: Sending file clipping")
-                        await writer.drain()
-
-                        # Send the requested file chunk
-                        with open(file_path, 'rb') as file:
-                            file.seek(offset)
-                            bytes_sent = 0
-                            while bytes_sent < size:
-                                chunk = file.read(min(1024, size - bytes_sent))
-                                if not chunk:
-                                    break
-                                writer.write(chunk)
-                                await writer.drain()
-                                bytes_sent += len(chunk)
-                        f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
-                    else:
-                        writer.write(b"ERROR: File not found")
-                    await writer.drain()
-
+            if command == "MET":
+                # Respond with file size
+                file_name = request_parts[1]
+                file_path = os.path.join(music_directory, file_name)
+                if os.path.exists(file_path):
+                    file_size = os.path.getsize(file_path)
+                    writer.write(str(file_size).encode())
                 else:
-                    writer.write(b"ERROR: Invalid command")
+                    writer.write(b"ERROR: File not found")
+                await writer.drain()
+
+            elif command == "REQ":
+                # Handle file clipping
+                file_name, offset, size = request_parts[1], int(request_parts[2]), int(request_parts[3])
+                file_path = os.path.join(music_directory, file_name)
+                if os.path.exists(file_path):
+                    writer.write(b"ACK: Sending file clipping")
                     await writer.drain()
-                    break
+
+                    # Send the requested file chunk
+                    with open(file_path, 'rb') as file:
+                        file.seek(offset)
+                        bytes_sent = 0
+                        while bytes_sent < size:
+                            chunk = file.read(min(1024, size - bytes_sent))
+                            if not chunk:
+                                break
+                            writer.write(chunk)
+                            await writer.drain()
+                            bytes_sent += len(chunk)
+                    f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
+                else:
+                    writer.write(b"ERROR: File not found")
+                await writer.drain()
+
+            else:
+                writer.write(b"ERROR: Invalid command")
+                await writer.drain()
 
         except Exception as e:
             f.write(f"Error handling request from {addr}: {e}\n")
