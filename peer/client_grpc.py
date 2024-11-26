@@ -267,11 +267,14 @@ async def request_metadata(client_info, file_name):
         writer.write(file_name.encode())
         await writer.drain()
         
-        response = await asyncio.wait_for(reader.read(1024), timeout=5)  # Timeout for metadata request
-        print(response)
-        if response.startswith(b"ERROR"):
+        response = await reader.read(1024)
+        
+        if(response.startswith(b"ACK")):
+            response = await asyncio.wait_for(reader.read(1024), timeout=5)  # Timeout for metadata request
+            file_size = int(response.decode())
+        # print(response)
+        elif response.startswith(b"ERROR"):
             return None
-        file_size = int(response.decode())
         writer.close()
         await writer.wait_closed()
         return ip_port, file_size
@@ -291,12 +294,14 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
         await writer.drain()
         
         message = await reader.read(1024)
+        print("Message:", message)
         if(message.startswith(b"ACK")):
             received_data = b""
             last_receive_time = asyncio.get_event_loop().time()
             while len(received_data) < size:
                 try:
                     chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
+                    print(chunk)
                     if not chunk:
                         break
                     received_data += chunk
@@ -493,6 +498,9 @@ async def handle_peer_requests(reader, writer):
                 file_name = request_parts[1]
                 file_path = os.path.join(music_directory, file_name)
                 if os.path.exists(file_path):
+                    writer.write(b"ACK: File found. Sending file...")
+                    await writer.drain()
+                    await asyncio.sleep(0.01)
                     file_size = os.path.getsize(file_path)
                     writer.write(str(file_size).encode())
                 else:
