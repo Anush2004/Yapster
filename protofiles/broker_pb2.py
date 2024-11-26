@@ -24,27 +24,29 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x62roker.proto\"\x1f\n\nClientInfo\x12\x11\n\tclient_id\x18\x01 \x01(\t\"\x16\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\":\n\x12SongRequestMessage\x12\x11\n\tsong_name\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\"A\n\x0cSongResponse\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\r\n\x05\x66ound\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"2\n\nSongUpdate\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x11\n\tsong_name\x18\x02 \x01(\t\")\n\x06Update\x12\x11\n\tsong_name\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t\"6\n\x12SongUpdateResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t2\xb1\x02\n\x0eNapsterService\x12\x1e\n\tHeartbeat\x12\x0b.ClientInfo\x1a\x04.Ack\x12,\n\x10InitializeClient\x12\x0b.SongUpdate\x1a\x07.Update(\x01\x30\x01\x12\x1a\n\x05Leave\x12\x0b.ClientInfo\x1a\x04.Ack\x12\x31\n\x0bSongRequest\x12\x13.SongRequestMessage\x1a\r.SongResponse\x12+\n\x07\x41\x64\x64Song\x12\x0b.SongUpdate\x1a\x13.SongUpdateResponse\x12.\n\nDeleteSong\x12\x0b.SongUpdate\x1a\x13.SongUpdateResponse\x12%\n\x0bPullUpdates\x12\x0b.ClientInfo\x1a\x07.Update0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x62roker.proto\"5\n\x10HeartbeatRequest\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x0e\n\x06\x64\x65mand\x18\x02 \x01(\x05\"\x1f\n\nClientInfo\x12\x11\n\tclient_id\x18\x01 \x01(\t\"\x16\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\":\n\x12SongRequestMessage\x12\x11\n\tsong_name\x18\x01 \x01(\t\x12\x11\n\tclient_id\x18\x02 \x01(\t\"A\n\x0cSongResponse\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\r\n\x05\x66ound\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"2\n\nSongUpdate\x12\x11\n\tclient_id\x18\x01 \x01(\t\x12\x11\n\tsong_name\x18\x02 \x01(\t\")\n\x06Update\x12\x11\n\tsong_name\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t\"6\n\x12SongUpdateResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t2\xd4\x02\n\x0eNapsterService\x12$\n\tHeartbeat\x12\x11.HeartbeatRequest\x1a\x04.Ack\x12,\n\x10InitializeClient\x12\x0b.SongUpdate\x1a\x07.Update(\x01\x30\x01\x12\x1a\n\x05Leave\x12\x0b.ClientInfo\x1a\x04.Ack\x12\x31\n\x0bSongRequest\x12\x13.SongRequestMessage\x1a\r.SongResponse\x12+\n\x07\x41\x64\x64Song\x12\x0b.SongUpdate\x1a\x13.SongUpdateResponse\x12.\n\nDeleteSong\x12\x0b.SongUpdate\x1a\x13.SongUpdateResponse\x12%\n\x0bPullUpdates\x12\x0b.ClientInfo\x1a\x07.Update0\x01\x12\x1b\n\x06Report\x12\x0b.ClientInfo\x1a\x04.Ackb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'broker_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_CLIENTINFO']._serialized_start=16
-  _globals['_CLIENTINFO']._serialized_end=47
-  _globals['_ACK']._serialized_start=49
-  _globals['_ACK']._serialized_end=71
-  _globals['_SONGREQUESTMESSAGE']._serialized_start=73
-  _globals['_SONGREQUESTMESSAGE']._serialized_end=131
-  _globals['_SONGRESPONSE']._serialized_start=133
-  _globals['_SONGRESPONSE']._serialized_end=198
-  _globals['_SONGUPDATE']._serialized_start=200
-  _globals['_SONGUPDATE']._serialized_end=250
-  _globals['_UPDATE']._serialized_start=252
-  _globals['_UPDATE']._serialized_end=293
-  _globals['_SONGUPDATERESPONSE']._serialized_start=295
-  _globals['_SONGUPDATERESPONSE']._serialized_end=349
-  _globals['_NAPSTERSERVICE']._serialized_start=352
-  _globals['_NAPSTERSERVICE']._serialized_end=657
+  _globals['_HEARTBEATREQUEST']._serialized_start=16
+  _globals['_HEARTBEATREQUEST']._serialized_end=69
+  _globals['_CLIENTINFO']._serialized_start=71
+  _globals['_CLIENTINFO']._serialized_end=102
+  _globals['_ACK']._serialized_start=104
+  _globals['_ACK']._serialized_end=126
+  _globals['_SONGREQUESTMESSAGE']._serialized_start=128
+  _globals['_SONGREQUESTMESSAGE']._serialized_end=186
+  _globals['_SONGRESPONSE']._serialized_start=188
+  _globals['_SONGRESPONSE']._serialized_end=253
+  _globals['_SONGUPDATE']._serialized_start=255
+  _globals['_SONGUPDATE']._serialized_end=305
+  _globals['_UPDATE']._serialized_start=307
+  _globals['_UPDATE']._serialized_end=348
+  _globals['_SONGUPDATERESPONSE']._serialized_start=350
+  _globals['_SONGUPDATERESPONSE']._serialized_end=404
+  _globals['_NAPSTERSERVICE']._serialized_start=407
+  _globals['_NAPSTERSERVICE']._serialized_end=747
 # @@protoc_insertion_point(module_scope)

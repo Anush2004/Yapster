@@ -25,8 +25,8 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         if request.client_id in self.clients:
             self.clients[request.client_id] = time.time()
             self.client_demands[request.client_id] = request.demand
-            if (self.client_malicious_requests[request.client_id][1] > 10 and self.client_malicious_requests[request.client_id][0]/self.client_malicious_requests[request.client_id][1] > 0.5):
-                return broker_pb2.Ack(success=False)
+            # if (self.client_malicious_requests[request.client_id][1] > 10 and self.client_malicious_requests[request.client_id][0]/self.client_malicious_requests[request.client_id][1] > 0.5):
+            #     return broker_pb2.Ack(success=False)
         else:
             return broker_pb2.Ack(success=False)
         return broker_pb2.Ack(success=True)

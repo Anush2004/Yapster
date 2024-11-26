@@ -4,6 +4,14 @@ from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class HeartbeatRequest(_message.Message):
+    __slots__ = ("client_id", "demand")
+    CLIENT_ID_FIELD_NUMBER: _ClassVar[int]
+    DEMAND_FIELD_NUMBER: _ClassVar[int]
+    client_id: str
+    demand: int
+    def __init__(self, client_id: _Optional[str] = ..., demand: _Optional[int] = ...) -> None: ...
+
 class ClientInfo(_message.Message):
     __slots__ = ("client_id",)
     CLIENT_ID_FIELD_NUMBER: _ClassVar[int]

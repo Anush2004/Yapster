@@ -36,7 +36,7 @@ class NapsterServiceStub(object):
         """
         self.Heartbeat = channel.unary_unary(
                 '/NapsterService/Heartbeat',
-                request_serializer=broker__pb2.ClientInfo.SerializeToString,
+                request_serializer=broker__pb2.HeartbeatRequest.SerializeToString,
                 response_deserializer=broker__pb2.Ack.FromString,
                 _registered_method=True)
         self.InitializeClient = channel.stream_stream(
@@ -68,6 +68,11 @@ class NapsterServiceStub(object):
                 '/NapsterService/PullUpdates',
                 request_serializer=broker__pb2.ClientInfo.SerializeToString,
                 response_deserializer=broker__pb2.Update.FromString,
+                _registered_method=True)
+        self.Report = channel.unary_unary(
+                '/NapsterService/Report',
+                request_serializer=broker__pb2.ClientInfo.SerializeToString,
+                response_deserializer=broker__pb2.Ack.FromString,
                 _registered_method=True)
 
 
@@ -117,12 +122,18 @@ class NapsterServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Report(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_NapsterServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Heartbeat': grpc.unary_unary_rpc_method_handler(
                     servicer.Heartbeat,
-                    request_deserializer=broker__pb2.ClientInfo.FromString,
+                    request_deserializer=broker__pb2.HeartbeatRequest.FromString,
                     response_serializer=broker__pb2.Ack.SerializeToString,
             ),
             'InitializeClient': grpc.stream_stream_rpc_method_handler(
@@ -155,6 +166,11 @@ def add_NapsterServiceServicer_to_server(servicer, server):
                     request_deserializer=broker__pb2.ClientInfo.FromString,
                     response_serializer=broker__pb2.Update.SerializeToString,
             ),
+            'Report': grpc.unary_unary_rpc_method_handler(
+                    servicer.Report,
+                    request_deserializer=broker__pb2.ClientInfo.FromString,
+                    response_serializer=broker__pb2.Ack.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'NapsterService', rpc_method_handlers)
@@ -181,7 +197,7 @@ class NapsterService(object):
             request,
             target,
             '/NapsterService/Heartbeat',
-            broker__pb2.ClientInfo.SerializeToString,
+            broker__pb2.HeartbeatRequest.SerializeToString,
             broker__pb2.Ack.FromString,
             options,
             channel_credentials,
@@ -345,6 +361,33 @@ class NapsterService(object):
             '/NapsterService/PullUpdates',
             broker__pb2.ClientInfo.SerializeToString,
             broker__pb2.Update.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Report(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/NapsterService/Report',
+            broker__pb2.ClientInfo.SerializeToString,
+            broker__pb2.Ack.FromString,
             options,
             channel_credentials,
             insecure,
