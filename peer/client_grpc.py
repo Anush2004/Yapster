@@ -92,7 +92,8 @@ class NapsterClient:
         ip_address = response.client_id.split(":")[0]
         port = int(response.client_id.split(":")[1])
         # print("Going to request")
-        request_file_from_peers(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+        client_results = await download_file(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+        print(client_results)
         print("File received successfully")
 
     async def song_request(self, stub, song_name):
@@ -102,7 +103,7 @@ class NapsterClient:
                 return
             response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
             if response.found:
-                
+                await self.request_for_song(song_name, response)
                 
             else:
                 print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
@@ -217,43 +218,43 @@ class NapsterClient:
         finally:
             await channel.close()  # Close the channel manually when done
     
-def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='shared_file.txt', save_as='received_file.txt'):
-    with open('../logs/peer_client.log', 'w') as f:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        f.write(f"Connecting to server at {server_ip}:{port}\n")
-        f.flush()
-        client_socket.connect((server_ip, port))
-        f.write(f"Connected to server at {server_ip}:{port}\n")
-        f.flush()
+# def request_file_from_peer(server_ip='192.168.2.140', port=12345, file_name='shared_file.txt', save_as='received_file.txt'):
+#     with open('../logs/peer_client.log', 'w') as f:
+#         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#         f.write(f"Connecting to server at {server_ip}:{port}\n")
+#         f.flush()
+#         client_socket.connect((server_ip, port))
+#         f.write(f"Connected to server at {server_ip}:{port}\n")
+#         f.flush()
     
-        try:
-            client_socket.send(b"CONNECT")
-            response = client_socket.recv(1024).decode()
-            if not response.startswith("ACK"):            
-                print(f"Server response: {response}.Try Again.")
-                return
-            f.write("Connection established with server\n")
-            f.flush()
-            # Request file
-            client_socket.send(file_name.encode())
-            response = client_socket.recv(32).decode()
-            if response.startswith("ERROR"):
-                print(f"Server response: {response}.Try Again")
-                return
-            f.write(f"Server response: {response}")
-            f.flush()
+#         try:
+#             client_socket.send(b"CONNECT")
+#             response = client_socket.recv(1024).decode()
+#             if not response.startswith("ACK"):            
+#                 print(f"Server response: {response}.Try Again.")
+#                 return
+#             f.write("Connection established with server\n")
+#             f.flush()
+#             # Request file
+#             client_socket.send(file_name.encode())
+#             response = client_socket.recv(32).decode()
+#             if response.startswith("ERROR"):
+#                 print(f"Server response: {response}.Try Again")
+#                 return
+#             f.write(f"Server response: {response}")
+#             f.flush()
             
-            # Receive file
-            save_as = os.path.join(music_directory, save_as)
-            with open(save_as, 'wb') as file:
-                while (data := client_socket.recv(1024)):
-                    file.write(data)
+#             # Receive file
+#             save_as = os.path.join(music_directory, save_as)
+#             with open(save_as, 'wb') as file:
+#                 while (data := client_socket.recv(1024)):
+#                     file.write(data)
         
-            # print(f"File has been received and saved in your music directory as {save_as}\n> ", end="")
-        except Exception as e:
-            print(f"Error: {e}.Try Again")
-        finally:
-            client_socket.close()
+#             # print(f"File has been received and saved in your music directory as {save_as}\n> ", end="")
+#         except Exception as e:
+#             print(f"Error: {e}.Try Again")
+#         finally:
+#             client_socket.close()
 
 async def request_metadata(client_info, file_name):
     ip_port, demand = client_info
@@ -332,7 +333,7 @@ async def download_file(clients_dict, file_name):
         # file_size -= size
         
     for ip_port in client_results:
-        if(ip_port not in active_addresses):
+        if(ip_port not in active_addresses and clients_dict[ip_port] < 100):
             client_results[ip_port] = -1
     
     if(len(active_addresses) == 0):
@@ -367,6 +368,8 @@ async def download_file(clients_dict, file_name):
         for ip_port in active_addresses:
             size, offset = unattained_files.pop(0)
             reassign_dict[ip_port] = (size, offset)
+            if(len(unattained_files) == 0):
+                break
         
         await asyncio.gather(*(handle_clipping(info) for info in reassign_dict.items()))
 
@@ -379,20 +382,79 @@ async def download_file(clients_dict, file_name):
     return client_results
  
 # to update    
+# async def handle_peer_requests(reader, writer):
+#     with open('../logs/peer_server.log', 'w') as f:
+#         global current_demand
+#         addr = writer.get_extra_info('peername')
+#         f.write(f"Connection established with {addr}\n")
+#         f.flush()
+#         try:
+#             demand_lock.acquire()
+#             current_demand += 1
+#             demand_lock.release()
+#             # Receive initial connection request
+#             init_request = await reader.read(1024)
+#             if init_request.decode() != "CONNECT":
+#                 # print("Invalid connection request")
+#                 writer.write(b"ERROR: Invalid connection request")
+#                 await writer.drain()
+#                 writer.close()
+#                 await writer.wait_closed()
+#                 demand_lock.acquire()
+#                 current_demand -= 1
+#                 demand_lock.release()
+#                 return
+            
+#             writer.write(b"ACK: Connection established")
+#             await writer.drain()
+        
+#         # Receive file request
+#             file_request = await reader.read(1024)
+#             file_request = os.path.join(music_directory, file_request.decode().strip())
+#             f.write(f"Client requested file: {file_request}\n")
+#             f.flush()
+        
+#             if os.path.exists(file_request):
+#                 writer.write(b"ACK: File found. Sending file...")
+#                 await writer.drain()
+                
+#                 # Send the file in chunks
+#                 with open(file_request, 'rb') as file:
+#                     while chunk := file.read(1024):
+#                         writer.write(chunk)
+#                         await writer.drain()
+#                 f.write("File sent successfully.\n")
+#             else:
+#                 writer.write(b"ERROR: File not found")
+#                 await writer.drain()
+#         except Exception as e:
+#             demand_lock.acquire()
+#             current_demand -= 1
+#             demand_lock.release()
+#             print(f"Error: {e}\n>")
+#         finally:
+#             writer.close()
+#             await writer.wait_closed()
+#             demand_lock.acquire()
+#             current_demand -= 1
+#             demand_lock.release()
+
 async def handle_peer_requests(reader, writer):
     with open('../logs/peer_server.log', 'w') as f:
         global current_demand
         addr = writer.get_extra_info('peername')
         f.write(f"Connection established with {addr}\n")
         f.flush()
+        timeout = 10  # Timeout in seconds
+
         try:
             demand_lock.acquire()
             current_demand += 1
             demand_lock.release()
+
             # Receive initial connection request
-            init_request = await reader.read(1024)
+            init_request = await asyncio.wait_for(reader.read(1024), timeout)
             if init_request.decode() != "CONNECT":
-                # print("Invalid connection request")
                 writer.write(b"ERROR: Invalid connection request")
                 await writer.drain()
                 writer.close()
@@ -401,34 +463,47 @@ async def handle_peer_requests(reader, writer):
                 current_demand -= 1
                 demand_lock.release()
                 return
-            
+
             writer.write(b"ACK: Connection established")
             await writer.drain()
-        
-        # Receive file request
-            file_request = await reader.read(1024)
-            file_request = os.path.join(music_directory, file_request.decode().strip())
-            f.write(f"Client requested file: {file_request}\n")
-            f.flush()
-        
-            if os.path.exists(file_request):
-                writer.write(b"ACK: File found. Sending file...")
-                await writer.drain()
-                
-                # Send the file in chunks
-                with open(file_request, 'rb') as file:
-                    while chunk := file.read(1024):
-                        writer.write(chunk)
+
+            # Handle file requests
+            while True:
+                try:
+                    data = await asyncio.wait_for(reader.read(1024), timeout)
+                    if not data:  # Client disconnected
+                        f.write(f"Client {addr} disconnected.\n")
+                        f.flush()
+                        break
+
+                    file_request = data.decode().strip()
+                    file_path = os.path.join(music_directory, file_request)
+                    f.write(f"Client requested file: {file_path}\n")
+                    f.flush()
+
+                    if os.path.exists(file_path):
+                        writer.write(b"ACK: File found. Sending file...")
                         await writer.drain()
-                f.write("File sent successfully.\n")
-            else:
-                writer.write(b"ERROR: File not found")
-                await writer.drain()
+
+                        with open(file_path, 'rb') as file:
+                            while chunk := file.read(1024):
+                                writer.write(chunk)
+                                await writer.drain()
+                        f.write("File sent successfully.\n")
+                        f.flush()
+                    else:
+                        writer.write(b"ERROR: File not found")
+                        await writer.drain()
+
+                except asyncio.TimeoutError:
+                    f.write(f"Connection with {addr} timed out.\n")
+                    f.flush()
+                    break
+
         except Exception as e:
-            demand_lock.acquire()
-            current_demand -= 1
-            demand_lock.release()
-            print(f"Error: {e}\n>")
+            f.write(f"Error: {e}\n")
+            f.flush()
+
         finally:
             writer.close()
             await writer.wait_closed()
