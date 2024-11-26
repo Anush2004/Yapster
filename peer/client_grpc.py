@@ -443,73 +443,84 @@ async def handle_peer_requests(reader, writer):
     with open('../logs/peer_server.log', 'w') as f:
         global current_demand
         addr = writer.get_extra_info('peername')
+        timeout = 600
         f.write(f"Connection established with {addr}\n")
         f.flush()
-        timeout = 600  # Timeout in seconds
 
         try:
-            demand_lock.acquire()
-            current_demand += 1
-            demand_lock.release()
+            # Increment demand safely
+            with demand_lock:
+                current_demand += 1
 
             # Receive initial connection request
-            init_request = await asyncio.wait_for(reader.read(1024), timeout)
-            if init_request.decode() != "CONNECT":
+            init_request = await reader.read(1024)
+            if init_request.decode().strip() != "CONNECT":
                 writer.write(b"ERROR: Invalid connection request")
                 await writer.drain()
-                writer.close()
-                await writer.wait_closed()
-                demand_lock.acquire()
-                current_demand -= 1
-                demand_lock.release()
                 return
-
+            
             writer.write(b"ACK: Connection established")
             await writer.drain()
 
-            # Handle file requests
+            # Handle metadata or file clipping requests
             while True:
-                try:
-                    data = await asyncio.wait_for(reader.read(1024), timeout)
-                    if not data:  # Client disconnected
-                        f.write(f"Client {addr} disconnected.\n")
-                        f.flush()
-                        break
+                request = await asyncio.wait_for(reader.read(1024), timeout=timeout)
+                if not request:
+                    break
 
-                    file_request = data.decode().strip()
-                    file_path = os.path.join(music_directory, file_request)
-                    f.write(f"Client requested file: {file_path}\n")
-                    f.flush()
+                request_parts = request.decode().strip().split(":")
+                command = request_parts[0]
 
+                if command == "METADATA":
+                    # Respond with file size
+                    file_name = request_parts[1]
+                    file_path = os.path.join(music_directory, file_name)
                     if os.path.exists(file_path):
-                        writer.write(b"ACK: File found. Sending file...")
-                        await writer.drain()
-
-                        with open(file_path, 'rb') as file:
-                            while chunk := file.read(1024):
-                                writer.write(chunk)
-                                await writer.drain()
-                        f.write("File sent successfully.\n")
-                        f.flush()
+                        file_size = os.path.getsize(file_path)
+                        writer.write(str(file_size).encode())
                     else:
                         writer.write(b"ERROR: File not found")
+                    await writer.drain()
+
+                elif command == "REQUEST":
+                    # Handle file clipping
+                    file_name, offset, size = request_parts[1], int(request_parts[2]), int(request_parts[3])
+                    file_path = os.path.join(music_directory, file_name)
+                    if os.path.exists(file_path):
+                        writer.write(b"ACK: Sending file clipping")
                         await writer.drain()
 
-                except asyncio.TimeoutError:
-                    f.write(f"Connection with {addr} timed out.\n")
-                    f.flush()
+                        # Send the requested file chunk
+                        with open(file_path, 'rb') as file:
+                            file.seek(offset)
+                            bytes_sent = 0
+                            while bytes_sent < size:
+                                chunk = file.read(min(1024, size - bytes_sent))
+                                if not chunk:
+                                    break
+                                writer.write(chunk)
+                                await writer.drain()
+                                bytes_sent += len(chunk)
+                        f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
+                    else:
+                        writer.write(b"ERROR: File not found")
+                    await writer.drain()
+
+                else:
+                    writer.write(b"ERROR: Invalid command")
+                    await writer.drain()
                     break
 
         except Exception as e:
-            f.write(f"Error: {e}\n")
-            f.flush()
-
+            f.write(f"Error handling request from {addr}: {e}\n")
         finally:
+            # Clean up and decrement demand safely
             writer.close()
             await writer.wait_closed()
-            demand_lock.acquire()
-            current_demand -= 1
-            demand_lock.release()
+            with demand_lock:
+                current_demand -= 1
+            f.write(f"Connection with {addr} closed\n")
+            f.flush()
 
 async def start_server(host='0.0.0.0', port=12345):
     global port_number
