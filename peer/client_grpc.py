@@ -318,7 +318,7 @@ async def download_file(clients_dict, file_name):
     metadata_results = [result for result in metadata_results if result is not None]
 
     # Calculate clippings based on demands
-    total_demand = sum(demand for _, demand in clients_dict.items())
+    total_demand = sum(demand for _, demand in clients_dict.items()) 
     offsets_sizes = {}
     offset = 0
     active_addresses = []

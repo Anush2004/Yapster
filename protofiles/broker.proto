@@ -21,6 +21,7 @@ service NapsterService {
     rpc AddSong(SongUpdate) returns (SongUpdateResponse);
     rpc DeleteSong(SongUpdate) returns (SongUpdateResponse);
     rpc PullUpdates(ClientInfo) returns (stream Update);
+    rpc Report(ClientInfo) returns (Ack);
 }
 
 message HeartbeatRequest {
