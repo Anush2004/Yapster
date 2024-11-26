@@ -35,7 +35,7 @@ class NapsterClient:
             while True:
                 # try:
                 # print("Sending Heartbeat")
-                response = await stub.HeartbeatRequest(broker_pb2.ClientInfo(client_id=self.client_id,demand = current_demand ))
+                response = await stub.Heartbeat(broker_pb2.HeartbeatRequest(client_id=self.client_id,demand = current_demand ))
                 if response.success:
                     f.write(f"Heartbeat sent for client {self.client_id}.\n")
                 else:
