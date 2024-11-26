@@ -300,7 +300,7 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
             while len(received_data) < size:
                 try:
                     chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
-                    print(chunk)
+                    # print(chunk)
                     if not chunk:
                         break
                     received_data += chunk
