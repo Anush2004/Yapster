@@ -89,10 +89,9 @@ class NapsterClient:
         # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
         client_dict = dict(eval(response.client_id))
         print(f"Song '{song_name}' found. Requesting file...")
-        ip_address = response.client_id.split(":")[0]
-        port = int(response.client_id.split(":")[1])
+        # print(client_dict)
         # print("Going to request")
-        client_results = await download_file(server_ip=ip_address,port=port,file_name=song_name, save_as=song_name)
+        client_results = await download_file(client_dict, file_name=song_name)
         print(client_results)
         print("File received successfully")
 
@@ -108,7 +107,7 @@ class NapsterClient:
             else:
                 print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
         except Exception as e:
-            print(f"Error requesting song: {e}\n> ", end="")
+            print(f"Error requesting song: {e} ")
 
     async def pull_updates(self, stub):
         with open('../logs/pull_updates.log', 'w') as f:
@@ -317,9 +316,11 @@ async def download_file(clients_dict, file_name):
         *(request_metadata(client_info, file_name) for client_info in clients_dict.items())
     )
     metadata_results = [result for result in metadata_results if result is not None]
+    
+    clients_dict = {ip_port: 1/(demand+1) for ip_port, demand in clients_dict.items()}
 
     # Calculate clippings based on demands
-    total_demand = sum(demand for _, demand in clients_dict.items()) 
+    total_demand = sum(demand for _, demand in clients_dict.items())
     offsets_sizes = {}
     offset = 0
     active_addresses = []
@@ -442,16 +443,17 @@ async def download_file(clients_dict, file_name):
 async def handle_peer_requests(reader, writer):
     with open('../logs/peer_server.log', 'w') as f:
         global current_demand
+        
+        demand_lock.acquire()
+        current_demand += 1
+        demand_lock.release()
+        
         addr = writer.get_extra_info('peername')
         timeout = 600
         f.write(f"Connection established with {addr}\n")
         f.flush()
 
         try:
-            # Increment demand safely
-            demand_lock.acquire()
-            current_demand += 1
-            demand_lock.release()
 
             # Receive initial connection request
             init_request = await reader.read(1024)
@@ -559,6 +561,7 @@ if __name__ == "__main__":
         pass
     # ip address  + port number
     ip_address = find_ip_address()
+    # print(repr(str(ip_address) + ":" + str(port_number)))
     client_id = str(ip_address) + ":" + str(port_number)
     
     if not os.path.exists(music_directory):
