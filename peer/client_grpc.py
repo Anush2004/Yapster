@@ -502,14 +502,19 @@ async def handle_peer_requests(reader, writer):
                     await asyncio.sleep(0.01)
                     file_size = os.path.getsize(file_path)
                     writer.write(str(file_size).encode())
+                    await writer.drain()
                 else:
                     writer.write(b"ERROR: File not found")
-                await writer.drain()
+                    await writer.drain()
 
             elif command == "REQ":
                 # Handle file clipping
-                file_name, offset, size = request_parts[1], int(request_parts[2]), int(request_parts[3])
+                request_parts = request_parts[1].split(":")
+                # print(request_parts)
+                asyncio.sleep(0.01)
+                file_name, offset, size = request_parts[0], int(request_parts[1]), int(request_parts[2])
                 file_path = os.path.join(music_directory, file_name)
+                # print(file_path, offset, size)
                 if os.path.exists(file_path):
                     writer.write(b"ACK: File found. Sending file...")
                     await writer.drain()
