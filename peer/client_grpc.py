@@ -266,9 +266,8 @@ async def request_metadata(client_info, file_name):
         await writer.drain()
         writer.write(file_name.encode())
         await writer.drain()
-        
+        await asyncio.sleep(0.01)
         response = await reader.read(1024)
-        
         if(response.startswith(b"ACK")):
             response = await asyncio.wait_for(reader.read(1024), timeout=5)  # Timeout for metadata request
             file_size = int(response.decode())
@@ -485,12 +484,12 @@ async def handle_peer_requests(reader, writer):
             await writer.drain()
 
             # Handle metadata or file clipping requests
-            request = await asyncio.wait_for(reader.read(3), timeout=timeout)
+            request = await asyncio.wait_for(reader.read(1024), timeout=timeout)
             if not request:
                 writer.write(b"ERROR: Request timed out.")
                 return
 
-            request_parts = request.decode().strip().split(":")
+            request_parts = [request.decode()[:3],request.decode()[3:]]
             command = request_parts[0]
 
             if command == "MET":
