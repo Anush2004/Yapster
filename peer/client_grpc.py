@@ -289,26 +289,33 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
         await writer.drain()
         writer.write(f"{file_name}:{offset}:{size}".encode())
         await writer.drain()
-
-        received_data = b""
-        last_receive_time = asyncio.get_event_loop().time()
-        while len(received_data) < size:
-            try:
-                chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
-                if not chunk:
-                    break
-                received_data += chunk
-                last_receive_time = asyncio.get_event_loop().time()
-            except asyncio.TimeoutError:
-                if asyncio.get_event_loop().time() - last_receive_time > timeout:
-                    raise TimeoutError("Client timed out during file transfer")
         
-        writer.close()
-        await writer.wait_closed()
-        if len(received_data) == size:
-            return ip_port, received_data
+        message = await reader.read(1024)
+        if(message.startswith(b"ACK")):
+            received_data = b""
+            last_receive_time = asyncio.get_event_loop().time()
+            while len(received_data) < size:
+                try:
+                    chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
+                    if not chunk:
+                        break
+                    received_data += chunk
+                    last_receive_time = asyncio.get_event_loop().time()
+                except asyncio.TimeoutError:
+                    if asyncio.get_event_loop().time() - last_receive_time > timeout:
+                        raise TimeoutError("Client timed out during file transfer")
+            
+            writer.close()
+            await writer.wait_closed()
+            if len(received_data) == size:
+                return ip_port, received_data
+            else:
+                raise ValueError("Incomplete data received")
         else:
-            raise ValueError("Incomplete data received")
+            print(f"Error requesting file clipping from {ip_port}: {message}")
+            writer.close()
+            await writer.wait_closed()
+            return None
     except Exception as e:
         print(f"Error requesting file clipping from {ip_port}: {e}")
         return None
@@ -497,9 +504,9 @@ async def handle_peer_requests(reader, writer):
                 file_name, offset, size = request_parts[1], int(request_parts[2]), int(request_parts[3])
                 file_path = os.path.join(music_directory, file_name)
                 if os.path.exists(file_path):
-                    writer.write(b"ACK: Sending file clipping")
+                    writer.write(b"ACK: File found. Sending file...")
                     await writer.drain()
-
+                    await asyncio.sleep(0.01)
                     # Send the requested file chunk
                     with open(file_path, 'rb') as file:
                         file.seek(offset)
