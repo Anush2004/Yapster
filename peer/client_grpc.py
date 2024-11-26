@@ -445,7 +445,7 @@ async def handle_peer_requests(reader, writer):
         addr = writer.get_extra_info('peername')
         f.write(f"Connection established with {addr}\n")
         f.flush()
-        timeout = 10  # Timeout in seconds
+        timeout = 600  # Timeout in seconds
 
         try:
             demand_lock.acquire()
