@@ -270,7 +270,7 @@ async def request_metadata(client_info, file_name):
             writer.write(file_name.encode())
             await writer.drain()
             await asyncio.sleep(0.01)
-            response = await reader.readuntil("\n")
+            response = await reader.readuntil(b"\n")
             if(response.startswith(b"ACK")):
                 response = await asyncio.wait_for(reader.read(1024), timeout=60)  # Timeout for metadata request
                 # print(response)
@@ -501,7 +501,7 @@ async def handle_peer_requests(reader, writer):
                 await writer.drain()
                 return
             
-            writer.write(b"ACK: Connection established")
+            writer.write(b"ACK: Connection established\n")
             await writer.drain()
 
             # Handle metadata or file clipping requests
