@@ -315,7 +315,8 @@ async def request_metadata(client_info, file_name):
 
 async def request_file_clipping(client_info, file_name, offset, size, timeout=10):
     ip_port, demand = client_info
-    faulty_client = "192.168.2.220:60767"
+    # faulty_client = "192.168.2.220:60767"
+    faulty_client = ""
     try:
         reader, writer = await asyncio.wait_for(asyncio.open_connection(*ip_port.split(':')), timeout=30)
         writer.write(b"CONNECT")
@@ -460,18 +461,18 @@ async def download_file(clients_dict, file_name):
         
         await asyncio.gather(*(handle_clipping(info) for info in reassign_dict.items()))
 
-    print(len(unattained_files))
+    # print(len(unattained_files))
     
     # Combine file parts and save -- where reassign dict da
     curr_offset = 0
-    print(remaining_data.keys())
+    # print(remaining_data.keys())
     with open(save_path, 'wb') as f:
-        while(curr_offset <= file_size):
+        while(curr_offset < file_size):
             # print(curr_offset, file_size)
             if(curr_offset in remaining_data):
                 f.write(remaining_data[curr_offset])
                 # print(remaining_data[curr_offset])
-                print(curr_offset, len(remaining_data[curr_offset]))
+                # print(curr_offset, len(remaining_data[curr_offset]))
                 curr_offset += len(remaining_data[curr_offset])
             else:
                 print(curr_offset, file_size)
