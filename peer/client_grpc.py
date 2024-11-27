@@ -331,7 +331,6 @@ async def download_file(clients_dict, file_name):
         *(request_metadata(client_info, file_name) for client_info in clients_dict.items())
     )
     metadata_results = [result for result in metadata_results if result is not None]
-    
     clients_dict = {ip_port: 1/(demand+1) for ip_port, demand in clients_dict.items()}
 
     # Calculate clippings based on demands
@@ -347,7 +346,6 @@ async def download_file(clients_dict, file_name):
         active_addresses.append(ip_port)
         # total_demand -= client_demand
         # file_size -= size
-        
     for ip_port in client_results:
         if(ip_port not in active_addresses and clients_dict[ip_port] < 100):
             client_results[ip_port] = -1
@@ -511,7 +509,7 @@ async def handle_peer_requests(reader, writer):
                 # Handle file clipping
                 request_parts = request_parts[1].split(":")
                 # print(request_parts)
-                asyncio.sleep(0.01)
+                await asyncio.sleep(0.01)
                 file_name, offset, size = request_parts[0], int(request_parts[1]), int(request_parts[2])
                 file_path = os.path.join(music_directory, file_name)
                 # print(file_path, offset, size)
