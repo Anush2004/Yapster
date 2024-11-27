@@ -15,6 +15,7 @@ import threading
 import socket
 import math  
 from collections import defaultdict
+import psutil
 
 
 demand_lock = threading.Lock()
@@ -412,6 +413,8 @@ async def download_file(clients_dict, file_name):
         # total_demand -= client_demand
         # file_size -= size
     
+    # print(offsets_sizes)
+    
     for ip_port in client_results:
         if(ip_port not in active_addresses and clients_dict[ip_port] < 100):
             client_results[ip_port] = -1
@@ -609,6 +612,14 @@ async def handle_peer_requests(reader, writer):
                     writer.write(b"ACK: File found. Sending file...\n")
                     await writer.drain()
                     await asyncio.sleep(0.01)
+                    
+                    # Initialize psutil tracking
+                    cpu_percentages = []
+                    ram_percentages = []
+                    psutil.cpu_percent(interval=None)  # Initialize CPU percentage measurement
+                    
+                    start_time = time.time()
+                    
                     # Send the requested file chunk
                     with open(file_path, 'rb') as file:
                         file.seek(offset)
@@ -617,11 +628,37 @@ async def handle_peer_requests(reader, writer):
                             chunk = file.read(min(1024, size - bytes_sent))
                             if not chunk:
                                 break
+                            # Collect resource stats during file transfer
+                            cpu_percentages.append(psutil.cpu_percent(interval=None))
+                            ram_percentages.append(psutil.virtual_memory().percent)
+                            
                             writer.write(chunk)
                             await writer.drain()
                             bytes_sent += len(chunk)
-                            print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
+                            # print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
                     f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
+                    
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    
+                    avg_cpu = sum(cpu_percentages) / len(cpu_percentages)
+                    avg_ram = sum(ram_percentages) / len(ram_percentages)
+                    
+                    max_cpu = max(cpu_percentages)
+                    max_ram = max(ram_percentages)
+                    
+                    min_cpu = min(cpu_percentages)
+                    min_ram = min(ram_percentages)
+                    
+                    print(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
+                    print(f"File transfer duration: {duration:.2f} seconds\n")
+                    print(f"Average CPU usage during transfer: {avg_cpu:.2f}%\n")
+                    print(f"Average RAM usage during transfer: {avg_ram:.2f}%\n")
+                    print(f"Max CPU usage during transfer: {max_cpu:.2f}%\n")
+                    print(f"Max RAM usage during transfer: {max_ram:.2f}%\n")
+                    print(f"Min CPU usage during transfer: {min_cpu:.2f}%\n")
+                    print(f"Min RAM usage during transfer: {min_ram:.2f}%\n")
+                
                 else:
                     writer.write(b"ERROR: File not found\n")
                 await writer.drain()
