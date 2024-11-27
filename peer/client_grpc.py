@@ -93,7 +93,7 @@ class NapsterClient:
         # print("Going to request")
         client_results = await download_file(client_dict, file_name=song_name)
         print(client_results)
-        print("File received successfully")
+        # print("File received successfully")
 
     async def song_request(self, stub, song_name):
         try:
@@ -262,21 +262,27 @@ async def request_metadata(client_info, file_name):
     try:
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
         writer.write(b"CONNECT")
-        writer.write(b"MET")
-        await writer.drain()
-        writer.write(file_name.encode())
-        await writer.drain()
-        await asyncio.sleep(0.01)
-        response = await reader.read(1024)
-        if(response.startswith(b"ACK")):
-            response = await asyncio.wait_for(reader.read(1024), timeout=60)  # Timeout for metadata request
-            file_size = int(response.decode())
-        # print(response)
-        elif response.startswith(b"ERROR"):
-            return None
-        writer.close()
-        await writer.wait_closed()
-        return ip_port, file_size
+        message = await reader.read(1024)
+        
+        if(message.startswith(b"ACK")):
+            writer.write(b"MET")
+            await writer.drain()
+            writer.write(file_name.encode())
+            await writer.drain()
+            await asyncio.sleep(0.01)
+            response = await reader.readuntil("\n")
+            if(response.startswith(b"ACK")):
+                response = await asyncio.wait_for(reader.read(1024), timeout=60)  # Timeout for metadata request
+                # print(response)
+                await asyncio.sleep(0.01)
+                file_size = int(response.decode())
+            # print(response)
+            elif response.startswith(b"ERROR"):
+                raise ValueError(response)
+            writer.close()
+            await writer.wait_closed()
+            return ip_port, file_size
+    
     except Exception as e:
         print(f"Error requesting metadata from {ip_port}: {e}")
         return None
@@ -287,7 +293,8 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=30
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
         writer.write(b"CONNECT")
         await writer.drain()
-        message = await reader.read(1024)
+        message = await reader.readuntil(b"\n")
+        # await asyncio.sleep(0.01)
         # print("Connection message:", message)
         
         if(message.startswith(b"ACK")):
@@ -296,8 +303,9 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=30
             writer.write(f"{file_name}:{offset}:{size}".encode())
             await writer.drain()
             
-            message = await reader.read(1024)
-            # print("Request message:", message)
+            message = await reader.readuntil(b"\n")
+            # await asyncio.sleep(0.01)
+            print("Request message:", message)
             if(message.startswith(b"ACK")):
                 received_data = b""
                 last_receive_time = asyncio.get_event_loop().time()
@@ -489,7 +497,7 @@ async def handle_peer_requests(reader, writer):
             # Receive initial connection request
             init_request = await reader.read(7)
             if init_request.decode().strip() != "CONNECT":
-                writer.write(b"ERROR: Invalid connection request")
+                writer.write(b"ERROR: Invalid connection request\n")
                 await writer.drain()
                 return
             
@@ -499,7 +507,7 @@ async def handle_peer_requests(reader, writer):
             # Handle metadata or file clipping requests
             request = await asyncio.wait_for(reader.read(1024), timeout=timeout)
             if not request:
-                writer.write(b"ERROR: Request timed out.")
+                writer.write(b"ERROR: Request timed out.\n")
                 return
 
             request_parts = [request.decode()[:3],request.decode()[3:]]
@@ -510,14 +518,14 @@ async def handle_peer_requests(reader, writer):
                 file_name = request_parts[1]
                 file_path = os.path.join(music_directory, file_name)
                 if os.path.exists(file_path):
-                    writer.write(b"ACK: File found. Sending file...")
+                    writer.write(b"ACK: File found. Sending file...\n")
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     file_size = os.path.getsize(file_path)
                     writer.write(str(file_size).encode())
                     await writer.drain()
                 else:
-                    writer.write(b"ERROR: File not found")
+                    writer.write(b"ERROR: File not found\n")
                     await writer.drain()
 
             elif command == "REQ":
@@ -529,7 +537,7 @@ async def handle_peer_requests(reader, writer):
                 file_path = os.path.join(music_directory, file_name)
                 # print(file_path, offset, size)
                 if os.path.exists(file_path):
-                    writer.write(b"ACK: File found. Sending file...")
+                    writer.write(b"ACK: File found. Sending file...\n")
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     # Send the requested file chunk
@@ -545,11 +553,11 @@ async def handle_peer_requests(reader, writer):
                             bytes_sent += len(chunk)
                     f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
                 else:
-                    writer.write(b"ERROR: File not found")
+                    writer.write(b"ERROR: File not found\n")
                 await writer.drain()
 
             else:
-                writer.write(b"ERROR: Invalid command")
+                writer.write(b"ERROR: Invalid command\n")
                 await writer.drain()
 
         except Exception as e:
