@@ -23,11 +23,14 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
     async def Heartbeat(self, request, context):
         print(f"Heartbeat received for client {request.client_id}. demand = {request.demand}")
         if request.client_id in self.clients:
+            # print(f"Client {request.client_id} is registered.")
             self.clients[request.client_id] = time.time()
             self.client_demands[request.client_id] = request.demand
+            print(f"Client {request.client_id} has malious requests: {self.client_malicious_requests[request.client_id][0]} out of {self.client_malicious_requests[request.client_id][1]}")
             if (self.client_malicious_requests[request.client_id][1] > 1 and self.client_malicious_requests[request.client_id][0]/self.client_malicious_requests[request.client_id][1] > 0.5):
                 return broker_pb2.Ack(success=False)
         else:
+            # print(f"Client {request.client_id} not registered.")
             return broker_pb2.Ack(success=False)
         return broker_pb2.Ack(success=True)
 
@@ -45,6 +48,8 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                     return 
                 self.clients[client_id] = time.time()
                 self.client_queues[client_id] = asyncio.Queue()
+                self.client_demands[client_id] = 0
+                self.client_malicious_requests[client_id] = [0,0]
                 first_message = False
                 continue
 

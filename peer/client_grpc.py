@@ -37,6 +37,7 @@ class NapsterClient:
                 # try:
                 # print("Sending Heartbeat")
                 response = await stub.Heartbeat(broker_pb2.HeartbeatRequest(client_id=self.client_id,demand = current_demand ))
+                # print(response)
                 if response.success:
                     f.write(f"Heartbeat sent for client {self.client_id}.\n")
                 else:
@@ -44,6 +45,7 @@ class NapsterClient:
                     kick_client = True
                 # except Exception as e:
                     # print(f"Error sending heartbeat: {e}")
+                
                 f.flush()
                 await asyncio.sleep(4)  # Send heartbeat every 5 seconds
 
@@ -157,7 +159,7 @@ class NapsterClient:
     async def command_interface(self, stub):
         """Handles interactive commands from the user."""
         print("Interactive mode started")
-        await asyncio.sleep(1) # Sleep for a bit to avoid spamming the console
+        await asyncio.sleep(2) # Sleep for a bit to avoid spamming the console
         print()
         print("Available commands:")
         print("  list_mine      - List all songs in your music directory")
@@ -204,7 +206,7 @@ class NapsterClient:
 
             # Initialize client
             await self.initialize_client(stub)
-
+            await asyncio.sleep(1)
             # Start other tasks
             task_heartbeat = asyncio.create_task(self.heartbeat(stub))
             task_pull_updates = asyncio.create_task(self.pull_updates(stub))
