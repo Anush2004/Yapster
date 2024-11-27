@@ -96,18 +96,15 @@ class NapsterClient:
         # print("File received successfully")
 
     async def song_request(self, stub, song_name):
-        try:
-            if song_name in self.local_songs:
-                print(f"Song '{song_name}' found in your music directory")
-                return
-            response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
-            if response.found:
-                await self.request_for_song(song_name, response)
-                
-            else:
-                print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
-        except Exception as e:
-            print(f"Error requesting song: {e} ")
+        if song_name in self.local_songs:
+            print(f"Song '{song_name}' found in your music directory")
+            return
+        response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
+        if response.found:
+            await self.request_for_song(song_name, response)
+            
+        else:
+            print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
 
     async def pull_updates(self, stub):
         with open('../logs/pull_updates.log', 'w') as f:
@@ -276,6 +273,7 @@ async def request_metadata(client_info, file_name):
                 # print(response)
                 await asyncio.sleep(0.01)
                 file_size = int(response.decode())
+                # print(file_size)
             # print(response)
             elif response.startswith(b"ERROR"):
                 raise ValueError(response)
@@ -287,7 +285,7 @@ async def request_metadata(client_info, file_name):
         print(f"Error requesting metadata from {ip_port}: {e}")
         return None
 
-async def request_file_clipping(client_info, file_name, offset, size, timeout=300):
+async def request_file_clipping(client_info, file_name, offset, size, timeout=10):
     ip_port, demand = client_info
     try:
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
@@ -305,7 +303,7 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=30
             
             message = await reader.readuntil(b"\n")
             # await asyncio.sleep(0.01)
-            print("Request message:", message)
+            # print(f"{ip_port} Request message:", message)
             if(message.startswith(b"ACK")):
                 received_data = b""
                 last_receive_time = asyncio.get_event_loop().time()
@@ -324,10 +322,13 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=30
                 
                 writer.close()
                 await writer.wait_closed()
-                if len(received_data) == size:
-                    return ip_port, received_data
-                else:
-                    raise ValueError("Incomplete data received")
+                # print(ip_port)
+                # print(received_data)
+                # print(len(received_data), size)
+                # if len(received_data) == size:
+                return ip_port, received_data
+                # else:
+                #     raise ValueError("Incomplete data received")
             else:
                 print(f"Error requesting file clipping from {ip_port}: {message}")
                 writer.close()
@@ -353,7 +354,8 @@ async def download_file(clients_dict, file_name):
     active_addresses = []
     for ip_port, file_size in metadata_results:
         client_demand = clients_dict[ip_port]
-        size = math.ceil((client_demand / total_demand) * file_size)
+        # size = math.ceil((client_demand / total_demand) * file_size)
+        size = math.ceil(file_size/len(metadata_results))
         offsets_sizes[ip_port] = (size, offset)  # size, offset
         offset += size
         active_addresses.append(ip_port)
@@ -370,7 +372,7 @@ async def download_file(clients_dict, file_name):
     start = time.time()
     
     # Request file clippings asynchronously
-    remaining_data = defaultdict(bytes)
+    remaining_data = dict()
     unattained_files = []
     async def handle_clipping(client_info):
         ip_port, (size, offset) = client_info
@@ -408,13 +410,20 @@ async def download_file(clients_dict, file_name):
     
     # Combine file parts and save -- where reassign dict da
     curr_offset = 0
+    print(remaining_data.keys())
     with open(save_path, 'wb') as f:
-        while(curr_offset != size):
+        while(curr_offset <= file_size):
+            # print(curr_offset, file_size)
             if(curr_offset in remaining_data):
                 f.write(remaining_data[curr_offset])
+                # print(remaining_data[curr_offset])
+                print(curr_offset, len(remaining_data[curr_offset]))
                 curr_offset += len(remaining_data[curr_offset])
             else:
-                print(curr_offset, size)
+                print(curr_offset, file_size)
+                break
+
+            # print(curr_offset)
     
     end = time.time()
     print("Received file in", end-start, "seconds")        
