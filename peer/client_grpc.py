@@ -620,7 +620,8 @@ async def handle_peer_requests(reader, writer):
                             writer.write(chunk)
                             await writer.drain()
                             bytes_sent += len(chunk)
-                            print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
+                            if bytes_sent % 102400 == 0: 
+                                print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
                     f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
                 else:
                     writer.write(b"ERROR: File not found\n")
