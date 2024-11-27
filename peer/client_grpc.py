@@ -83,7 +83,7 @@ class NapsterClient:
             response = await stub.DeleteSong(broker_pb2.SongUpdate(client_id=self.client_id, song_name=song_name))
             # print(f"Delete song response: {response.message}\n> ", end="")
         except Exception as e:
-            print(f"Error deleting song: {e}\n> ", end="")
+            print(f"Error deleting song: {e}\n ", end="")
     
     async def request_for_song(self, song_name, response):
         # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
@@ -147,7 +147,7 @@ class NapsterClient:
     async def command_interface(self, stub):
         """Handles interactive commands from the user."""
         print("Interactive mode started")
-        await asyncio.sleep(5) # Sleep for a bit to avoid spamming the console
+        await asyncio.sleep(1) # Sleep for a bit to avoid spamming the console
         print()
         print("Available commands:")
         print("  list_mine      - List all songs in your music directory")
@@ -269,7 +269,7 @@ async def request_metadata(client_info, file_name):
         await asyncio.sleep(0.01)
         response = await reader.read(1024)
         if(response.startswith(b"ACK")):
-            response = await asyncio.wait_for(reader.read(1024), timeout=5)  # Timeout for metadata request
+            response = await asyncio.wait_for(reader.read(1024), timeout=60)  # Timeout for metadata request
             file_size = int(response.decode())
         # print(response)
         elif response.startswith(b"ERROR"):
@@ -281,45 +281,50 @@ async def request_metadata(client_info, file_name):
         print(f"Error requesting metadata from {ip_port}: {e}")
         return None
 
-async def request_file_clipping(client_info, file_name, offset, size, timeout=10):
+async def request_file_clipping(client_info, file_name, offset, size, timeout=300):
     ip_port, demand = client_info
     try:
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
         writer.write(b"CONNECT")
         await writer.drain()
-        writer.write(b"REQ")
-        await writer.drain()
-        writer.write(f"{file_name}:{offset}:{size}".encode())
-        await writer.drain()
-        
         message = await reader.read(1024)
-        print("Message:", message)
+        # print("Connection message:", message)
+        
         if(message.startswith(b"ACK")):
-            received_data = b""
-            last_receive_time = asyncio.get_event_loop().time()
-            while len(received_data) < size:
-                try:
-                    chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
-                    # print(chunk)
-                    if not chunk:
-                        break
-                    received_data += chunk
-                    last_receive_time = asyncio.get_event_loop().time()
-                except asyncio.TimeoutError:
-                    if asyncio.get_event_loop().time() - last_receive_time > timeout:
-                        raise TimeoutError("Client timed out during file transfer")
+            writer.write(b"REQ")
+            await writer.drain()
+            writer.write(f"{file_name}:{offset}:{size}".encode())
+            await writer.drain()
             
-            writer.close()
-            await writer.wait_closed()
-            if len(received_data) == size:
-                return ip_port, received_data
+            message = await reader.read(1024)
+            # print("Request message:", message)
+            if(message.startswith(b"ACK")):
+                received_data = b""
+                last_receive_time = asyncio.get_event_loop().time()
+                while len(received_data) <= size:
+                    try:
+                        chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
+                        # print(chunk)
+                        if not chunk:
+                            break
+                        # print(type(chunk))
+                        received_data += chunk
+                        last_receive_time = asyncio.get_event_loop().time()
+                    except asyncio.TimeoutError:
+                        if asyncio.get_event_loop().time() - last_receive_time > timeout:
+                            raise TimeoutError("Client timed out during file transfer")
+                
+                writer.close()
+                await writer.wait_closed()
+                if len(received_data) == size:
+                    return ip_port, received_data
+                else:
+                    raise ValueError("Incomplete data received")
             else:
-                raise ValueError("Incomplete data received")
-        else:
-            print(f"Error requesting file clipping from {ip_port}: {message}")
-            writer.close()
-            await writer.wait_closed()
-            return None
+                print(f"Error requesting file clipping from {ip_port}: {message}")
+                writer.close()
+                await writer.wait_closed()
+                return None
     except Exception as e:
         print(f"Error requesting file clipping from {ip_port}: {e}")
         return None
@@ -354,6 +359,8 @@ async def download_file(clients_dict, file_name):
         print("File not found. Please try again later.")
         return client_results
     
+    start = time.time()
+    
     # Request file clippings asynchronously
     remaining_data = defaultdict(bytes)
     unattained_files = []
@@ -363,6 +370,7 @@ async def download_file(clients_dict, file_name):
         if result is not None:
             ip_port, data = result
             remaining_data[offset] = data[:size]
+            # print(ip_port , len(remaining_data) , size , offset)
             client_results[ip_port] = 1  # File sent completely
         else:
             active_addresses.remove(ip_port)
@@ -390,14 +398,21 @@ async def download_file(clients_dict, file_name):
 
     print(len(unattained_files))
     
-    # Combine file parts and save
+    # Combine file parts and save -- where reassign dict da
+    curr_offset = 0
     with open(save_path, 'wb') as f:
-        for ip_port in metadata_results:
-            if ip_port in remaining_data:
-                f.write(remaining_data[ip_port])
-
+        while(curr_offset != size):
+            if(curr_offset in remaining_data):
+                f.write(remaining_data[curr_offset])
+                curr_offset += len(remaining_data[curr_offset])
+            else:
+                print(curr_offset, size)
+    
+    end = time.time()
+    print("Received file in", end-start, "seconds")        
+            
     return client_results
- 
+
 # to update    
 # async def handle_peer_requests(reader, writer):
 #     with open('../logs/peer_server.log', 'w') as f:
@@ -509,7 +524,7 @@ async def handle_peer_requests(reader, writer):
                 # Handle file clipping
                 request_parts = request_parts[1].split(":")
                 # print(request_parts)
-                await asyncio.sleep(0.01)
+                # await asyncio.sleep(0.01)
                 file_name, offset, size = request_parts[0], int(request_parts[1]), int(request_parts[2])
                 file_path = os.path.join(music_directory, file_name)
                 # print(file_path, offset, size)
@@ -521,7 +536,7 @@ async def handle_peer_requests(reader, writer):
                     with open(file_path, 'rb') as file:
                         file.seek(offset)
                         bytes_sent = 0
-                        while bytes_sent < size:
+                        while bytes_sent <= size:
                             chunk = file.read(min(1024, size - bytes_sent))
                             if not chunk:
                                 break
