@@ -534,12 +534,15 @@ async def handle_peer_requests(reader, writer):
             if command == "MET":
                 # Respond with file size
                 file_name = request_parts[1]
+                print(file_name)
                 file_path = os.path.join(music_directory, file_name)
+                print(file_path)
                 if os.path.exists(file_path):
                     writer.write(b"ACK: File found. Sending file...\n")
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     file_size = os.path.getsize(file_path)
+                    print(file_size)
                     writer.write(str(file_size).encode())
                     await writer.drain()
                 else:
@@ -625,7 +628,7 @@ if __name__ == "__main__":
     ip_address = find_ip_address()
     # print(repr(str(ip_address) + ":" + str(port_number)))
     client_id = str(ip_address) + ":" + str(port_number)
-    
+    print(f"Client ID: {client_id}")
     if not os.path.exists(music_directory):
         print("Music directory not found. Please create a 'music' directory in the current folder.")
         sys.exit(1)
