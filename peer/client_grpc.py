@@ -270,10 +270,10 @@ async def request_metadata(client_info, file_name):
             response = await reader.readuntil(b"\n")
             if(response.startswith(b"ACK")):
                 response = await asyncio.wait_for(reader.read(1024), timeout=60)  # Timeout for metadata request
-                print(response)
+                # print(response)
                 await asyncio.sleep(0.01)
                 file_size = int(response.decode())
-                print(file_size)
+                # print(file_size)
             # print(response)
             elif response.startswith(b"ERROR"):
                 raise ValueError(response)
@@ -287,6 +287,7 @@ async def request_metadata(client_info, file_name):
 
 async def request_file_clipping(client_info, file_name, offset, size, timeout=10):
     ip_port, demand = client_info
+    faulty_client = "192.168.2.220:60767"
     try:
         reader, writer = await asyncio.open_connection(*ip_port.split(':'))
         writer.write(b"CONNECT")
@@ -308,29 +309,31 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
             # print(f"{ip_port} Request message:", message)
             if(message.startswith(b"ACK")):
                 received_data = b""
-                last_receive_time = asyncio.get_event_loop().time()
                 while len(received_data) <= size:
                     try:
-                        chunk = await asyncio.wait_for(reader.read(min(size - len(received_data), 1024)), timeout=timeout)
+                        if(ip_port == faulty_client ):
+                            print("Waiting for chunk")
+                        chunk = await reader.read(min(size - len(received_data), 1024))
                         # print(chunk)
+                        if(ip_port == faulty_client):
+                            print(len(chunk))
                         if not chunk:
                             break
                         # print(type(chunk))
                         received_data += chunk
-                        last_receive_time = asyncio.get_event_loop().time()
-                    except asyncio.TimeoutError:
-                        if asyncio.get_event_loop().time() - last_receive_time > timeout:
-                            raise TimeoutError("Client timed out during file transfer")
+                    except Exception as e:
+                        raise ValueError(e)
                 
                 writer.close()
                 await writer.wait_closed()
                 # print(ip_port)
                 # print(received_data)
                 # print(len(received_data), size)
-                # if len(received_data) == size:
-                return ip_port, received_data
-                # else:
-                #     raise ValueError("Incomplete data received")
+                if len(received_data) == size:
+                    # print("Unequal length")
+                    return ip_port, received_data
+                else:
+                    raise ValueError("Incomplete data received")
             else:
                 print(f"Error requesting file clipping from {ip_port}: {message}")
                 writer.close()
@@ -361,6 +364,8 @@ async def download_file(clients_dict, file_name):
         client_demand = clients_dict[ip_port]
         # size = math.ceil((client_demand / total_demand) * file_size)
         size = math.ceil(file_size/len(metadata_results))
+        if(offset + size > file_size):
+            size = file_size - offset
         offsets_sizes[ip_port] = (size, offset)  # size, offset
         offset += size
         active_addresses.append(ip_port)
@@ -369,6 +374,8 @@ async def download_file(clients_dict, file_name):
     for ip_port in client_results:
         if(ip_port not in active_addresses and clients_dict[ip_port] < 100):
             client_results[ip_port] = -1
+    
+    # print(offsets_sizes)
     
     if(len(active_addresses) == 0):
         print("File not found. Please try again later.")
@@ -392,7 +399,7 @@ async def download_file(clients_dict, file_name):
             client_results[ip_port] = -1  # File not sent completely
             unattained_files.append((size, offset))            
 
-    print(offsets_sizes)
+    # print(offsets_sizes)
     
     await asyncio.gather(*(handle_clipping(info) for info in offsets_sizes.items()))
     
