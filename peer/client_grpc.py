@@ -92,10 +92,12 @@ class NapsterClient:
     async def report(self, stub,client_results):
         try:
             client_results = str(client_results)
+            # print(client_results)
             response = await stub.Report(broker_pb2.ClientInfo(client_id=client_results))
+            # print(response)
             while not response.success:
                 response = await stub.Report(broker_pb2.ClientInfo(client_id=client_results))
-            print(f"Report response: {response.success}")
+            # print(f"Report response: {response.success}")
         except Exception as e:
             print(f"Error reporting: {e}\n> ", end="")
 
@@ -225,8 +227,8 @@ class NapsterClient:
 
             # await asyncio.gather(task_command_interface, task_heartbeat, task_pull_updates, task_monitor_directory)
 
-        except grpc.aio.AioRpcError as e:
-            print(f"gRPC connection error: {e}\n> ", end="")
+        # except grpc.aio.AioRpcError as e:
+        #     print(f"gRPC connection error: {e}\n> ", end="")
         # except Exception as e:
         #     print(f"General error: {e}\n> ", end="")
         finally:
@@ -275,7 +277,7 @@ async def request_metadata(client_info, file_name):
     if demand >= 100:
         return None  # Skip clients with demand >= 100
     try:
-        print("Attempting connect")
+        # print("Attempting connect")
         reader, writer = await asyncio.wait_for(asyncio.open_connection(*ip_port.split(':')), timeout=5)
         print("Connected")
         writer.write(b"CONNECT")
