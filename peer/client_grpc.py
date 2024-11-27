@@ -264,16 +264,16 @@ async def request_metadata(client_info, file_name):
         if(message.startswith(b"ACK")):
             writer.write(b"MET")
             await writer.drain()
-            writer.write(file_name.encode())
+            writer.write(str(file_name+"\n").encode())
             await writer.drain()
             await asyncio.sleep(0.01)
             response = await reader.readuntil(b"\n")
             if(response.startswith(b"ACK")):
                 response = await asyncio.wait_for(reader.read(1024), timeout=60)  # Timeout for metadata request
-                # print(response)
+                print(response)
                 await asyncio.sleep(0.01)
                 file_size = int(response.decode())
-                # print(file_size)
+                print(file_size)
             # print(response)
             elif response.startswith(b"ERROR"):
                 raise ValueError(response)
@@ -298,8 +298,10 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
         if(message.startswith(b"ACK")):
             writer.write(b"REQ")
             await writer.drain()
-            writer.write(f"{file_name}:{offset}:{size}".encode())
+            writer.write(f"{file_name}:{offset}:{size}\n".encode())
             await writer.drain()
+            
+            # print(f"{file_name}:{offset}:{size}")
             
             message = await reader.readuntil(b"\n")
             # await asyncio.sleep(0.01)
@@ -346,13 +348,16 @@ async def download_file(clients_dict, file_name):
     )
     metadata_results = [result for result in metadata_results if result is not None]
     clients_dict = {ip_port: 1/(demand+1) for ip_port, demand in clients_dict.items()}
-
+    
     # Calculate clippings based on demands
     total_demand = sum(demand for _, demand in clients_dict.items())
     offsets_sizes = {}
     offset = 0
     active_addresses = []
+    file_size = metadata_results[0][1]
+    # print(file_size, len(metadata_results))
     for ip_port, file_size in metadata_results:
+        # print(file_size)
         client_demand = clients_dict[ip_port]
         # size = math.ceil((client_demand / total_demand) * file_size)
         size = math.ceil(file_size/len(metadata_results))
@@ -387,6 +392,8 @@ async def download_file(clients_dict, file_name):
             client_results[ip_port] = -1  # File not sent completely
             unattained_files.append((size, offset))            
 
+    print(offsets_sizes)
+    
     await asyncio.gather(*(handle_clipping(info) for info in offsets_sizes.items()))
     
     while(len(unattained_files) > 0):
@@ -514,10 +521,12 @@ async def handle_peer_requests(reader, writer):
             await writer.drain()
 
             # Handle metadata or file clipping requests
-            request = await asyncio.wait_for(reader.read(1024), timeout=timeout)
+            request = await asyncio.wait_for(reader.readuntil(b"\n"), timeout=timeout)
             if not request:
                 writer.write(b"ERROR: Request timed out.\n")
                 return
+            
+            request = request.strip()
 
             request_parts = [request.decode()[:3],request.decode()[3:]]
             command = request_parts[0]
