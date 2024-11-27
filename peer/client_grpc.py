@@ -21,6 +21,7 @@ demand_lock = threading.Lock()
 music_directory = "../music"
 port_number = None
 current_demand = 0
+kick_client = False
 class NapsterClient:
     def __init__(self, client_id, server_address='192.168.2.220:4018', music_dir="music"):
         self.client_id = client_id
@@ -40,6 +41,7 @@ class NapsterClient:
                     f.write(f"Heartbeat sent for client {self.client_id}.\n")
                 else:
                     f.write(f"Heartbeat failed for client {self.client_id}.\n")
+                    kick_client = True
                 # except Exception as e:
                     # print(f"Error sending heartbeat: {e}")
                 f.flush()
@@ -85,14 +87,25 @@ class NapsterClient:
         except Exception as e:
             print(f"Error deleting song: {e}\n ", end="")
     
-    async def request_for_song(self, song_name, response):
+    async def report(self, stub,client_results):
+        try:
+            client_results = str(client_results)
+            response = await stub.Report(broker_pb2.ClientInfo(client_id=client_results))
+            while not response.success:
+                response = await stub.Report(broker_pb2.ClientInfo(client_id=client_results))
+            print(f"Report response: {response.success}")
+        except Exception as e:
+            print(f"Error reporting: {e}\n> ", end="")
+
+    async def request_for_song(self, stub ,song_name, response):
         # print(f"Song '{song_name}' found on client: {response.client_id}.\n> ", end="")
         client_dict = dict(eval(response.client_id))
         print(f"Song '{song_name}' found. Requesting file...")
         # print(client_dict)
         # print("Going to request")
         client_results = await download_file(client_dict, file_name=song_name)
-        print(client_results)
+        report_results = await self.report(stub,client_results)
+        # print(client_results)
         # print("File received successfully")
 
     async def song_request(self, stub, song_name):
@@ -101,7 +114,7 @@ class NapsterClient:
             return
         response = await stub.SongRequest(broker_pb2.SongRequestMessage(client_id=self.client_id, song_name=song_name))
         if response.found:
-            await self.request_for_song(song_name, response)
+            await self.request_for_song( stub,song_name, response)
             
         else:
             print(f"Song '{song_name}' not found. Message: {response.message}\n> ", end="")
@@ -155,7 +168,10 @@ class NapsterClient:
         while True:
             command = await aioconsole.ainput("> ")  # Await the asynchronous input
             command = command.strip().lower()  # Now strip and lower the input
-
+            if (kick_client):
+                print("You have been kicked from the server. Please check your port or keep enough file descriptors open.")
+                await self.leave(stub)
+                break
             if command == "list_mine":
                 print("Current songs in your music directory:")
                 for song in sorted(self.local_songs):
