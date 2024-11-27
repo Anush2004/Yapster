@@ -11,7 +11,7 @@ pwd = pwd + '/protofiles'
 sys.path.append(pwd)
 import broker_pb2
 import broker_pb2_grpc
-MAX_MALICIOUS = 2
+MAX_MALICIOUS = 10
 
 class Broker(broker_pb2_grpc.NapsterServiceServicer):
     def __init__(self):
@@ -22,12 +22,12 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         self.client_malicious_requests = defaultdict(list) # {client_id: [malicious_requests, total_requests]}
         
     async def Heartbeat(self, request, context):
-        print(f"Heartbeat received for client {request.client_id} has demand right now = {request.demand} and malious claims on last 10 requests: {sum(self.client_malicious_requests[request.client_id])} out of {len(self.client_malicious_requests[request.client_id])}")
+        print(f"Heartbeat received for client {request.client_id} has demand right now = {request.demand} and malious claims on last {MAX_MALICIOUS} requests: {sum(self.client_malicious_requests[request.client_id])} out of {len(self.client_malicious_requests[request.client_id])}")
         if request.client_id in self.clients:
             # print(f"Client {request.client_id} is registered.")
             self.clients[request.client_id] = time.time()
             self.client_demands[request.client_id] = request.demand
-            if (len(self.client_malicious_requests[request.client_id]) == MAX_MALICIOUS and sum(self.client_malicious_requests[request.client_id]/MAX_MALICIOUS) > 0.5):
+            if (len(self.client_malicious_requests[request.client_id]) == MAX_MALICIOUS and (sum(self.client_malicious_requests[request.client_id])/MAX_MALICIOUS) > 0.5):
                 return broker_pb2.Ack(success=False)
         else:
             # print(f"Client {request.client_id} not registered.")
