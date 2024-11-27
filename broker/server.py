@@ -11,6 +11,7 @@ pwd = pwd + '/protofiles'
 sys.path.append(pwd)
 import broker_pb2
 import broker_pb2_grpc
+MAX_MALICIOUS = 2
 
 class Broker(broker_pb2_grpc.NapsterServiceServicer):
     def __init__(self):
@@ -19,16 +20,14 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         self.songs = defaultdict(list)  # {song_name: [client_id, ...]}
         self.client_queues = defaultdict(asyncio.Queue)  # {client_id: asyncio.Queue}
         self.client_malicious_requests = defaultdict(list) # {client_id: [malicious_requests, total_requests]}
-    
+        
     async def Heartbeat(self, request, context):
-        print(f"Heartbeat received for client {request.client_id}. demand = {request.demand}")
+        print(f"Heartbeat received for client {request.client_id} has demand right now = {request.demand} and malious claims on last 10 requests: {sum(self.client_malicious_requests[request.client_id])} out of {len(self.client_malicious_requests[request.client_id])}")
         if request.client_id in self.clients:
             # print(f"Client {request.client_id} is registered.")
             self.clients[request.client_id] = time.time()
             self.client_demands[request.client_id] = request.demand
-            print(f"Client {request.client_id} has malious requests: {self.client_malicious_requests[request.client_id][0]} out of {self.client_malicious_requests[request.client_id][1]}")
-            if (self.client_malicious_requests[request.client_id][1] > 0 and (self.client_malicious_requests[request.client_id][0]/self.client_malicious_requests[request.client_id][1]) > 0.5):
-                print("reached")
+            if (len(self.client_malicious_requests[request.client_id]) == MAX_MALICIOUS and sum(self.client_malicious_requests[request.client_id]/MAX_MALICIOUS) > 0.5):
                 return broker_pb2.Ack(success=False)
         else:
             # print(f"Client {request.client_id} not registered.")
@@ -50,7 +49,7 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
                 self.clients[client_id] = time.time()
                 self.client_queues[client_id] = asyncio.Queue()
                 self.client_demands[client_id] = 0
-                self.client_malicious_requests[client_id] = [0,0]
+                self.client_malicious_requests[client_id] = []
                 first_message = False
                 continue
 
@@ -95,13 +94,18 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
         return broker_pb2.SongResponse(found=False,message="Song not found.")
 
     async def Report(self,request,context):
+        
         client_requests = dict(eval(request.client_id))
         for client, type in client_requests.items():
             if type == 1:
-                self.client_malicious_requests[client][1] += 1
+                self.client_malicious_requests[client].append(0)
+                if(len(self.client_malicious_requests[client])>MAX_MALICIOUS):
+                    self.client_malicious_requests[client].pop(0)
             elif type ==-1:
-                self.client_malicious_requests[client][0] += 1
-                self.client_malicious_requests[client][1] += 1
+                self.client_malicious_requests[client].append(1)
+                if(len(self.client_malicious_requests[client])>MAX_MALICIOUS):
+                    self.client_malicious_requests[client].pop(0)
+                
             else:
                 pass
 
