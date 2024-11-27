@@ -227,8 +227,8 @@ class NapsterClient:
 
         except grpc.aio.AioRpcError as e:
             print(f"gRPC connection error: {e}\n> ", end="")
-        except Exception as e:
-            print(f"General error: {e}\n> ", end="")
+        # except Exception as e:
+        #     print(f"General error: {e}\n> ", end="")
         finally:
             await channel.close()  # Close the channel manually when done
     
@@ -275,7 +275,9 @@ async def request_metadata(client_info, file_name):
     if demand >= 100:
         return None  # Skip clients with demand >= 100
     try:
-        reader, writer = await asyncio.open_connection(*ip_port.split(':'))
+        print("Attempting connect")
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(*ip_port.split(':')), timeout=5)
+        print("Connected")
         writer.write(b"CONNECT")
         message = await reader.read(1024)
         
@@ -299,6 +301,10 @@ async def request_metadata(client_info, file_name):
             await writer.wait_closed()
             return ip_port, file_size
     
+    except asyncio.TimeoutError:
+        print(f"Timeout requesting metadata from {ip_port}")
+        return None
+    
     except Exception as e:
         print(f"Error requesting metadata from {ip_port}: {e}")
         return None
@@ -307,7 +313,7 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
     ip_port, demand = client_info
     faulty_client = "192.168.2.220:60767"
     try:
-        reader, writer = await asyncio.open_connection(*ip_port.split(':'))
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(*ip_port.split(':')), timeout=30)
         writer.write(b"CONNECT")
         await writer.drain()
         message = await reader.readuntil(b"\n")
@@ -357,6 +363,10 @@ async def request_file_clipping(client_info, file_name, offset, size, timeout=10
                 writer.close()
                 await writer.wait_closed()
                 return None
+    except asyncio.TimeoutError:
+        print(f"Timeout requesting metadata from {ip_port}")
+        return None
+    
     except Exception as e:
         print(f"Error requesting file clipping from {ip_port}: {e}")
         return None
@@ -369,6 +379,13 @@ async def download_file(clients_dict, file_name):
     )
     metadata_results = [result for result in metadata_results if result is not None]
     clients_dict = {ip_port: 1/(demand+1) for ip_port, demand in clients_dict.items()}
+    
+    if(len(metadata_results) == 0):
+        for ip_port in client_results:
+            if(clients_dict[ip_port] < 100):
+                client_results[ip_port] = -1
+        print("File not found. Please try again later.")
+        return client_results
     
     # Calculate clippings based on demands
     total_demand = sum(demand for _, demand in clients_dict.items())
@@ -389,6 +406,7 @@ async def download_file(clients_dict, file_name):
         active_addresses.append(ip_port)
         # total_demand -= client_demand
         # file_size -= size
+    
     for ip_port in client_results:
         if(ip_port not in active_addresses and clients_dict[ip_port] < 100):
             client_results[ip_port] = -1
