@@ -281,7 +281,7 @@ async def request_metadata(client_info, file_name):
     try:
         # print("Attempting connect")
         reader, writer = await asyncio.wait_for(asyncio.open_connection(*ip_port.split(':')), timeout=5)
-        print("Connected")
+        # print("Connected")
         writer.write(b"CONNECT")
         message = await reader.read(1024)
         
@@ -398,12 +398,12 @@ async def download_file(clients_dict, file_name):
     offset = 0
     active_addresses = []
     file_size = metadata_results[0][1]
-    # print(file_size, len(metadata_results))
+    # print(file_size, len(metadata_results))print
     for ip_port, file_size in metadata_results:
         # print(file_size)
         client_demand = clients_dict[ip_port]
-        # size = math.ceil((client_demand / total_demand) * file_size)
-        size = math.ceil(file_size/len(metadata_results))
+        size = math.ceil((client_demand / total_demand) * file_size)
+        # size = math.ceil(file_size/len(metadata_results))
         if(offset + size > file_size):
             size = file_size - offset
         offsets_sizes[ip_port] = (size, offset)  # size, offset
@@ -582,15 +582,15 @@ async def handle_peer_requests(reader, writer):
             if command == "MET":
                 # Respond with file size
                 file_name = request_parts[1]
-                print(file_name)
+                # print(file_name)
                 file_path = os.path.join(music_directory, file_name)
-                print(file_path)
+                # print(file_path)
                 if os.path.exists(file_path):
                     writer.write(b"ACK: File found. Sending file...\n")
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     file_size = os.path.getsize(file_path)
-                    print(file_size)
+                    # print(file_size)
                     writer.write(str(file_size).encode())
                     await writer.drain()
                 else:
@@ -620,7 +620,7 @@ async def handle_peer_requests(reader, writer):
                             writer.write(chunk)
                             await writer.drain()
                             bytes_sent += len(chunk)
-                            # print(bytes_sent)
+                            print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
                     f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
                 else:
                     writer.write(b"ERROR: File not found\n")
