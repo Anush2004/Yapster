@@ -33,6 +33,7 @@ class NapsterClient:
     async def heartbeat(self, stub):
         # print("Starting heartbeat function")
         with open('../logs/heartbeat.log', 'w') as f:
+            global kick_client
             while True:
                 # try:
                 # print("Sending Heartbeat")
@@ -43,6 +44,7 @@ class NapsterClient:
                 else:
                     f.write(f"Heartbeat failed for client {self.client_id}.\n")
                     kick_client = True
+                    
                 # except Exception as e:
                     # print(f"Error sending heartbeat: {e}")
                 

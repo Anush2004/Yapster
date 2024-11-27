@@ -27,7 +27,8 @@ class Broker(broker_pb2_grpc.NapsterServiceServicer):
             self.clients[request.client_id] = time.time()
             self.client_demands[request.client_id] = request.demand
             print(f"Client {request.client_id} has malious requests: {self.client_malicious_requests[request.client_id][0]} out of {self.client_malicious_requests[request.client_id][1]}")
-            if (self.client_malicious_requests[request.client_id][1] > 1 and (self.client_malicious_requests[request.client_id][0]/self.client_malicious_requests[request.client_id][1]) > 0.5):
+            if (self.client_malicious_requests[request.client_id][1] > 0 and (self.client_malicious_requests[request.client_id][0]/self.client_malicious_requests[request.client_id][1]) > 0.5):
+                print("reached")
                 return broker_pb2.Ack(success=False)
         else:
             # print(f"Client {request.client_id} not registered.")
