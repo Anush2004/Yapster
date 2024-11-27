@@ -613,10 +613,12 @@ async def handle_peer_requests(reader, writer):
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     
+                    current_process = psutil.Process()
+                    
                     # Initialize psutil tracking
                     cpu_percentages = []
                     ram_percentages = []
-                    psutil.cpu_percent(interval=None)  # Initialize CPU percentage measurement
+                    current_process.cpu_percent(interval=None)  # Initialize CPU percentage measurement
                     
                     start_time = time.time()
                     
@@ -626,11 +628,13 @@ async def handle_peer_requests(reader, writer):
                         bytes_sent = 0
                         while bytes_sent <= size:
                             chunk = file.read(min(1024, size - bytes_sent))
+                            
+                            # Collect resource stats during file transfer
+                            cpu_percentages.append(current_process.cpu_percent(interval=None))
+                            ram_percentages.append(current_process.memory_percent())
+                            
                             if not chunk:
                                 break
-                            # Collect resource stats during file transfer
-                            cpu_percentages.append(psutil.cpu_percent(interval=None))
-                            ram_percentages.append(psutil.virtual_memory().percent)
                             
                             writer.write(chunk)
                             await writer.drain()
