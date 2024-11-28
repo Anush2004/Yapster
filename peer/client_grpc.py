@@ -613,7 +613,7 @@ async def handle_peer_requests(reader, writer):
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     
-                    current_process = psutil.Process()
+                    current_process = psutil.Process(os.getpid())
                     
                     # Initialize psutil tracking
                     cpu_percentages = []
@@ -630,7 +630,7 @@ async def handle_peer_requests(reader, writer):
                             chunk = file.read(min(1024, size - bytes_sent))
                             
                             # Collect resource stats during file transfer
-                            cpu_percentages.append(current_process.cpu_percent(interval=None))
+                            cpu_percentages.append(current_process.cpu_percent(interval=None)/psutil.cpu_count())
                             ram_percentages.append(current_process.memory_percent())
                             
                             if not chunk:
@@ -639,7 +639,12 @@ async def handle_peer_requests(reader, writer):
                             writer.write(chunk)
                             await writer.drain()
                             bytes_sent += len(chunk)
-                            # print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
+                            if bytes_sent % 10240 == 0:
+                                avg_cpu = sum(cpu_percentages) / len(cpu_percentages)
+                                avg_ram = sum(ram_percentages) / len(ram_percentages)
+                                print(f"Average CPU usage during transfer: {avg_cpu:.2f}%\n")
+                                print(f"Average RAM usage during transfer: {avg_ram:.2f}%\n")
+                                print("Sent", bytes_sent, "/", size , "bytes from offset", offset, "for file", file_name)
                     f.write(f"Sent {size} bytes from offset {offset} for file {file_name}\n")
                     
                     end_time = time.time()
