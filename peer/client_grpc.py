@@ -613,7 +613,7 @@ async def handle_peer_requests(reader, writer):
                     await writer.drain()
                     await asyncio.sleep(0.01)
                     
-                    current_process = psutil.Process()
+                    current_process = psutil.Process(os.getpid())
                     
                     # Initialize psutil tracking
                     cpu_percentages = []
